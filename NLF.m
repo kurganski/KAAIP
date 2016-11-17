@@ -179,12 +179,13 @@ else                        % ЕСЛИ Ч/Б ИЗОБРАЖЕНИЕ
     set(handles.ShowMenu,'String',{'Изображения';'Гистограммы полутонов'},'Value',1);
 end
 
+set(handles.OriginalPanel,'Visible','on');      % отобразили панель
 set(handles.Utilits,'Enable','on');
 set(handles.CopyOriginalImage,'Enable','on');
 set(handles.FiltrationMenu,'Enable','on');              % разблокировали меню фильтрации
 set(handles.View_Original,'Enable','on');               % разблокировали исходный масштаб
 
-ChannelSlider_Callback(hObject, eventdata, handles);    % выполняем функцию отображения
+ShowMenu_Callback(hObject, eventdata, handles);    % выполняем функцию отображения
 
 
 % МЕНЮ "ПОЛУЧИТЬ СНИМОК С КАМЕРЫ"
@@ -645,55 +646,65 @@ end
 % СЛАЙДЕР КАНАЛОВ
 function ChannelSlider_Callback(hObject, eventdata, handles)
 
-global Original;            % оригинал изображения
-global Noised;              % зашумленный вариант
-global Filtered;            % отфильтрованное изображение
-global Assessment_N;              % пиковое с/ш зашумленного изображения
-global Assessment_F;              % пиковое с/ш отфильтрованного изображения
-
-channel = get(handles.ChannelSlider,'Value');   % считываем слайдер и округляем
-set(handles.OriginalPanel,'Visible','on');      % отобразили панель
+ch = get(handles.ChannelSlider,'Value');   % считываем слайдер и округляем
 string = get(handles.AssessMenu,'String');              
 Assess =  char(string(get(handles.AssessMenu,'Value')));
 MenuString = get(handles.ShowMenu,'String');
 WhatToShow = MenuString(get(handles.ShowMenu,'Value'));
 
+if hObject ~= handles.ShowButton
+    
+    if ch == 0 && strcmp(handles.uipanel8.Visible,'on')    % если не полутоновое изображение
+        
+        handles.Red.Value = 1;
+        handles.Green.Value = 2;
+        handles.Blue.Value = 3;
+    else
+        handles.Red.Value = ch;
+        handles.Green.Value = ch;
+        handles.Blue.Value = ch;
+    end
+end
 
-% if get(handles.NLFHist,'Value') == 1    % если нужно строить гистограммы
-%     switch channel                      % смотрим какой канал выбран
-%         case 0                          % если все RGB
-%             set(handles.ChannelString,'String','RGB');  % прописываем строчку
-%             set(handles.Red,'Value',1);
-%             set(handles.Green,'Value',2);
-%             set(handles.Blue,'Value',3);
-%         otherwise                                       % иначе номер канала
-%             set(handles.ChannelString,'String',['Канал № ' num2str(channel)]);
-%     end
-%     
-%     NLFHist_Callback(hObject, eventdata, handles);      % функция гистограмм
-%     return;                                             % все сама строит
-% end
-
-% для формирования заголовков изображения
+ch(1) = handles.Red.Value;
+ch(2) = handles.Green.Value;
+ch(3) = handles.Blue.Value;
 
 switch char(WhatToShow)       % смотрим, что нужно показать
     
-    case 'Изображения'
-        
-        % если channel == 0, тогда ch = 1:end? else ch = value
+    case {'Изображения','SSIM-изображения'}        
+       
+            Im = getappdata(handles.OriginalAxes,'Image');
+            Im = Im(:,:,ch);
+            ImObject = findobj('Parent',handles.OriginalAxes,'Tag','ImObject');
+            ImObject.CData = Im;            
+            
+            Im = getappdata(handles.NoiseAxes,'Image');
+            
+            if ~isempty(Im)
+                Im = Im(:,:,ch,handles.NoisedMenu.Value);
+                ImObject = findobj('Parent',handles.NoiseAxes,'Tag','ImObject');
+                ImObject.CData = Im;
+                
+                Im = getappdata(handles.FiltAxes,'Image');
+                Im = Im(:,:,ch,handles.FilteredMenu.Value);
+                ImObject = findobj('Parent',handles.FiltAxes,'Tag','ImObject');
+                ImObject.CData = Im;
+            end
         
     case 'Гистограммы полутонов'
         
-    case 'Гистограммы HSV'
         
-    case 'SSIM-изображения'
+        
+    case 'Гистограммы HSV'  
+       
+       
         
     otherwise
         
         assert(0,'Строка меня "Показывать" считалась не корректно');
         
-end
-        
+end       
         
 
 % если SNR или PSNR, тогда нужно добавить дБ в конце
@@ -703,129 +714,128 @@ else
     dB = '';
 end
 
-% 0-й канал - это RGB
-if channel == 0     
-      
-    if hObject ~= handles.ShowButton            % нажата кнопка "отобразить"
-        set(handles.Red,'Value',1);
-        set(handles.Green,'Value',2);
-        set(handles.Blue,'Value',3);    
-    end   
-         
-    Im(:,:,1) = Original(:,:,get(handles.Red,'Value'));         % рассылаем по каналам
-    Im(:,:,2) = Original(:,:,get(handles.Green,'Value'));
-    Im(:,:,3) = Original(:,:,get(handles.Blue,'Value'));
-    set(handles.ChannelString,'String','RGB');
-      
-    OI = imshow(Im,'Parent',handles.OriginalAxes);              % и показываем
-    set(OI,'UIContextMenu',handles.OriginalImageContextMenu);
-    set(handles.OriginalAxes,'Position',[20 50 300 300]);            % ставим ось на место, после гистограмм
-    
-    if isempty(Noised) ~= 1 && size(Original,3) == size(Noised,3)        % если получено зашумленное изображение
-        
-        I = get(handles.NoisedMenu,'Value');
-        Im_N(:,:,1) = Noised(:,:,get(handles.Red,'Value'),I);     % рассылаем по каналам
-        Im_N(:,:,2) = Noised(:,:,get(handles.Green,'Value'),I);
-        Im_N(:,:,3) = Noised(:,:,get(handles.Blue,'Value'),I);
-        
-        set(handles.NoisedMenu,'Visible','on');     % делаем видимой выпадающий список        
-        ON = imshow(Im_N,'Parent',handles.NoiseAxes);                          % создаем показ картинки
-        set(ON,'UIContextMenu',handles.NoisedImageContextMenu); % приктлеиваем контекстное меню к ней
-        set(handles.NoiseAxes,'Position',[20 50 300 300]);        % ставим ось на место, после гистограмм 
-        
-        % формируем заголовок        
-        if getfield(Assessment_N,{I},char(Assess),{channel+1}) == inf
-            val = char(8734);
-        elseif isnan(getfield(Assessment_N,{I},char(Assess),{channel+1})) == 1
-            val = '0/0';
-        else
-            val = num2str(getfield(Assessment_N,{I},char(Assess),{channel+1}));
-        end
-        title(handles.NoiseAxes,[Assess ' = ' val dB],'FontWeight','bold');  
-        
-        I = get(handles.FilteredMenu,'Value');
-        Im_F(:,:,1) = Filtered(:,:,get(handles.Red,'Value'),I);     % рассылаем по каналам
-        Im_F(:,:,2) = Filtered(:,:,get(handles.Green,'Value'),I);
-        Im_F(:,:,3) = Filtered(:,:,get(handles.Blue,'Value'),I);
-        
-        set(handles.FiltAgain,'Enable','on');
-        set(handles.Filtered,'Enable','on');
-        OF = imshow(Im_F,'Parent',handles.FiltAxes);
-        set(OF,'UIContextMenu',handles.FilteredImageContextMenu);
-        set(handles.FiltAxes,'Position',[20 50 300 300]);        % ставим ось на место, после гистограмм
-        
-        % формируем заголовок
-        if getfield(Assessment_F,{I},char(Assess),{channel+1}) == inf
-            val = char(8734);
-        elseif isnan(getfield(Assessment_F,{I},char(Assess),{channel+1})) == 1
-            val = '0/0';
-        else
-            val = num2str(getfield(Assessment_F,{I},char(Assess),{channel+1}));
-        end
-        title(handles.FiltAxes,[Assess ' = ' val dB],'FontWeight','bold');
-    end
-       
-else            % если задали моно-канал  
-         
-    set(handles.Red,'Value',channel);
-    set(handles.Green,'Value',channel);
-    set(handles.Blue,'Value',channel);
-    set(handles.ChannelString,'String',['Канал № ' num2str(channel)]);
-    
-    Im = Original(:,:,channel);
-    cla(handles.OriginalAxes,'reset');
-    OI = imshow(Im,'Parent',handles.OriginalAxes);
-    set(OI,'UIContextMenu',handles.OriginalImageContextMenu);
-    set(handles.OriginalAxes,'Position',[20 50 300 300]);
-    
-    if isempty(Noised) ~= 1 && size(Original,3) == size(Noised,3)
-        
-        I = get(handles.NoisedMenu,'Value');
-        Im_N = Noised(:,:,channel,I);
-        
-        ON = imshow(Im_N,'Parent',handles.NoiseAxes);
-        set(ON,'UIContextMenu',handles.NoisedImageContextMenu); % приктлеиваем контекстное меню к ней
-        set(handles.NoiseAxes,'Position',[20 50 300 300]);
-        
-        set(handles.NoisePanel,'Visible','on');     % видна панель
-        set(handles.NoisedMenu,'Visible','on');     % делаем видимой выпадающий список
-        set(handles.Noised,'Enable','on');          % доступна менюшка
-        
-        % формируем заголовок
-        if getfield(Assessment_N,{I},char(Assess),{channel+1}) == inf
-            val = char(8734);
-        elseif isnan(getfield(Assessment_N,{I},char(Assess),{channel+1})) == 1
-            val = '0/0';
-        else
-            val = num2str(getfield(Assessment_N,{I},char(Assess),{channel+1}));
-        end
-        title(handles.NoiseAxes,[Assess ' = ' val dB],'FontWeight','bold');
-        
-        I = get(handles.FilteredMenu,'Value');
-        Im_F = Filtered(:,:,channel,I);
-        
-        OF = imshow(Im_F,'Parent',handles.FiltAxes);
-        set(OF,'UIContextMenu',handles.FilteredImageContextMenu);
-        set(handles.FiltAxes,'Position',[20 50 300 300]);
-        
-        set(handles.FilteredMenu,'Visible','on');   % делаем видимой выпадающий список
-        set(handles.FiltPanel,'Visible','on');
-        set(handles.Filtered,'Enable','on');
-        set(handles.FiltAgain,'Enable','on');
-        
-        % формируем заголовок
-        if getfield(Assessment_F,{I},char(Assess),{channel+1}) == inf
-            val = char(8734);
-        elseif isnan(getfield(Assessment_F,{I},char(Assess),{channel+1})) == 1
-            val = '0/0';
-        else
-            val = num2str(getfield(Assessment_F,{I},char(Assess),{channel+1}));
-        end
-        title(handles.FiltAxes,[Assess ' = ' val dB],'FontWeight','bold');
-    
-    end    
-    
-end
+% 
+% 
+% 
+% % 0-й канал - это RGB
+% if channel == 0     
+%       
+% %     if hObject ~= handles.ShowButton            % нажата кнопка "отобразить"
+% %         set(handles.Red,'Value',1);
+% %         set(handles.Green,'Value',2);
+% %         set(handles.Blue,'Value',3);    
+% %     end   
+%          
+%     Im(:,:,1) = Original(:,:,get(handles.Red,'Value'));         % рассылаем по каналам
+%     Im(:,:,2) = Original(:,:,get(handles.Green,'Value'));
+%     Im(:,:,3) = Original(:,:,get(handles.Blue,'Value'));
+%     set(handles.ChannelString,'String','RGB');
+%       
+%    
+%     
+%     if isempty(Noised) ~= 1 && size(Original,3) == size(Noised,3)        % если получено зашумленное изображение
+%         
+%         I = get(handles.NoisedMenu,'Value');
+%         Im_N(:,:,1) = Noised(:,:,get(handles.Red,'Value'),I);     % рассылаем по каналам
+%         Im_N(:,:,2) = Noised(:,:,get(handles.Green,'Value'),I);
+%         Im_N(:,:,3) = Noised(:,:,get(handles.Blue,'Value'),I);
+%         
+%         set(handles.NoisedMenu,'Visible','on');     % делаем видимой выпадающий список        
+%         
+%         
+%         % формируем заголовок        
+%         if getfield(Assessment_N,{I},char(Assess),{channel+1}) == inf
+%             val = char(8734);
+%         elseif isnan(getfield(Assessment_N,{I},char(Assess),{channel+1})) == 1
+%             val = '0/0';
+%         else
+%             val = num2str(getfield(Assessment_N,{I},char(Assess),{channel+1}));
+%         end
+%         title(handles.NoiseAxes,[Assess ' = ' val dB],'FontWeight','bold');  
+%         
+%         I = get(handles.FilteredMenu,'Value');
+%         Im_F(:,:,1) = Filtered(:,:,get(handles.Red,'Value'),I);     % рассылаем по каналам
+%         Im_F(:,:,2) = Filtered(:,:,get(handles.Green,'Value'),I);
+%         Im_F(:,:,3) = Filtered(:,:,get(handles.Blue,'Value'),I);
+%         
+%         set(handles.FiltAgain,'Enable','on');
+%         set(handles.Filtered,'Enable','on');
+%         OF = imshow(Im_F,'Parent',handles.FiltAxes);
+%         set(OF,'UIContextMenu',handles.FilteredImageContextMenu);
+%         set(handles.FiltAxes,'Position',[20 50 300 300]);        % ставим ось на место, после гистограмм
+%         
+%         % формируем заголовок
+%         if getfield(Assessment_F,{I},char(Assess),{channel+1}) == inf
+%             val = char(8734);
+%         elseif isnan(getfield(Assessment_F,{I},char(Assess),{channel+1})) == 1
+%             val = '0/0';
+%         else
+%             val = num2str(getfield(Assessment_F,{I},char(Assess),{channel+1}));
+%         end
+%         title(handles.FiltAxes,[Assess ' = ' val dB],'FontWeight','bold');
+%     end
+%        
+% else            % если задали моно-канал  
+%          
+%     set(handles.Red,'Value',channel);
+%     set(handles.Green,'Value',channel);
+%     set(handles.Blue,'Value',channel);
+%     set(handles.ChannelString,'String',['Канал № ' num2str(channel)]);
+%     
+%     Im = Original(:,:,channel);
+%     cla(handles.OriginalAxes,'reset');
+%     OI = imshow(Im,'Parent',handles.OriginalAxes);
+%     set(OI,'UIContextMenu',handles.OriginalImageContextMenu);
+%     set(handles.OriginalAxes,'Position',[20 50 300 300]);
+%     
+%     if isempty(Noised) ~= 1 && size(Original,3) == size(Noised,3)
+%         
+%         I = get(handles.NoisedMenu,'Value');
+%         Im_N = Noised(:,:,channel,I);
+%         
+%         ON = imshow(Im_N,'Parent',handles.NoiseAxes);
+%         set(ON,'UIContextMenu',handles.NoisedImageContextMenu); % приктлеиваем контекстное меню к ней
+%         set(handles.NoiseAxes,'Position',[20 50 300 300]);
+%         
+%         set(handles.NoisePanel,'Visible','on');     % видна панель
+%         set(handles.NoisedMenu,'Visible','on');     % делаем видимой выпадающий список
+%         set(handles.Noised,'Enable','on');          % доступна менюшка
+%         
+%         % формируем заголовок
+%         if getfield(Assessment_N,{I},char(Assess),{channel+1}) == inf
+%             val = char(8734);
+%         elseif isnan(getfield(Assessment_N,{I},char(Assess),{channel+1})) == 1
+%             val = '0/0';
+%         else
+%             val = num2str(getfield(Assessment_N,{I},char(Assess),{channel+1}));
+%         end
+%         title(handles.NoiseAxes,[Assess ' = ' val dB],'FontWeight','bold');
+%         
+%         I = get(handles.FilteredMenu,'Value');
+%         Im_F = Filtered(:,:,channel,I);
+%         
+%         OF = imshow(Im_F,'Parent',handles.FiltAxes);
+%         set(OF,'UIContextMenu',handles.FilteredImageContextMenu);
+%         set(handles.FiltAxes,'Position',[20 50 300 300]);
+%         
+%         set(handles.FilteredMenu,'Visible','on');   % делаем видимой выпадающий список
+%         set(handles.FiltPanel,'Visible','on');
+%         set(handles.Filtered,'Enable','on');
+%         set(handles.FiltAgain,'Enable','on');
+%         
+%         % формируем заголовок
+%         if getfield(Assessment_F,{I},char(Assess),{channel+1}) == inf
+%             val = char(8734);
+%         elseif isnan(getfield(Assessment_F,{I},char(Assess),{channel+1})) == 1
+%             val = '0/0';
+%         else
+%             val = num2str(getfield(Assessment_F,{I},char(Assess),{channel+1}));
+%         end
+%         title(handles.FiltAxes,[Assess ' = ' val dB],'FontWeight','bold');
+%     
+%     end    
+%     
+% end
     
 
 % СЛАЙДЕР ГРАФИКОВ
@@ -1028,17 +1038,35 @@ global Assessment_F;              % пиковое с/ш отфильтрованного изображения
 MenuString = get(handles.ShowMenu,'String');
 WhatToShow = MenuString(get(handles.ShowMenu,'Value'));
 
+if size(Original,3) ~= 1            % если не полутоновое изображение
+    ch(1,1) = handles.Red.Value;
+    ch(1,2) = handles.Green.Value;
+    ch(1,3) = handles.Blue.Value;
+else
+    ch = 1;
+end
+
 switch char(WhatToShow)       % смотрим, что нужно показать
     
     case 'Изображения'
         
-        handles.OriginalAxes.UserData = Original;
-        
+        setappdata(handles.OriginalAxes,'Image',Original);        
         handles.uipanel8.Visible = 'on';
         
+        OI = imshow(Original(:,:,ch),'Parent',handles.OriginalAxes);  
+        set(OI,'UIContextMenu',handles.OriginalImageContextMenu,'Tag','ImObject');   
+        set(handles.OriginalAxes,'Position',[20 50 300 300]);       % ставим ось на место, после гистограмм
+                       
         if ~isempty(Noised)
-            handles.OriginalAxes.UserData = Noised;
-            handles.FiltAxes.UserData = Original;
+            setappdata(handles.NoiseAxes,'Image',Noised);
+            ON = imshow(Noised(:,:,ch,handles.NoisedMenu.Value),'Parent',handles.NoiseAxes); 
+            set(ON,'UIContextMenu',handles.NoisedImageContextMenu,'Tag','ImObject');
+            set(handles.NoiseAxes,'Position',[20 50 300 300]);      % ставим ось на место, после гистограмм
+            
+            setappdata(handles.FiltAxes,'Image',Filtered);
+            OF = imshow(Filtered(:,:,ch,handles.FilteredMenu.Value),'Parent',handles.FiltAxes);
+            set(OF,'UIContextMenu',handles.FilteredImageContextMenu,'Tag','ImObject');
+            set(handles.FiltAxes,'Position',[20 50 300 300]);
         end
         
     case 'Гистограммы полутонов'
@@ -1074,11 +1102,31 @@ switch char(WhatToShow)       % смотрим, что нужно показать
         
     case 'SSIM-изображения'
         
-        handles.OriginalAxes.UserData = Original;
-        handles.NoiseAxes.UserData = Assessment_N.SSIM_Image;
-        handles.FiltAxes.UserData = Assessment_F.SSIM_Image;        
+        setappdata(handles.OriginalAxes,'Image',Original);   
+        Im_N = zeros(size(Original,1),size(Original,2),size(Original,3),size(Assessment_N,2),'uint8');
+        Im_F = zeros(size(Im_N),'uint8');
+        
+        for x = 1:size(Assessment_N,2)
+            Im_N(:,:,:,x) = Assessment_N(x).SSIM_Image;
+            Im_F(:,:,:,x) = Assessment_F(x).SSIM_Image;
+        end
+           
         
         handles.uipanel8.Visible = 'on';
+        
+        OI = imshow(Original(:,:,ch),'Parent',handles.OriginalAxes);  
+        set(OI,'UIContextMenu',handles.OriginalImageContextMenu,'Tag','ImObject');   % привязываем контекстное меню
+        set(handles.OriginalAxes,'Position',[20 50 300 300]);       % ставим ось на место, после гистограмм
+        
+        setappdata(handles.NoiseAxes,'Image',Im_N); 
+        ON = imshow(Im_N(:,:,ch,handles.NoisedMenu.Value),'Parent',handles.NoiseAxes);
+        set(ON,'UIContextMenu',handles.NoisedImageContextMenu,'Tag','ImObject'); % приктлеиваем контекстное меню к ней
+        set(handles.NoiseAxes,'Position',[20 50 300 300]);      % ставим ось на место, после гистограмм
+        
+        setappdata(handles.FiltAxes,'Image',Im_F); 
+        OF = imshow(Im_F(:,:,ch,handles.FilteredMenu.Value),'Parent',handles.FiltAxes);
+        set(OF,'UIContextMenu',handles.FilteredImageContextMenu,'Tag','ImObject');
+        set(handles.FiltAxes,'Position',[20 50 300 300]);
         
     otherwise
         
@@ -4566,6 +4614,7 @@ else    % иначе сделаем недоступным
 end
 
 % вызовем подфункцию, которая нарисует графики и обновить картинки
+ShowMenu_Callback(hObject, eventdata, handles);
 AssessMenu_Callback(hObject, eventdata, handles);
 
 % выставляем начальные значения и делаем видимыми объекты
