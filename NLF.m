@@ -165,7 +165,7 @@ if size(Original,3) > 1     % ЕСЛИ ЦВЕТНОЕ ИЗОБРАЖЕНИЕ
     set(handles.Green,'String',str,'Value',2);
     set(handles.Blue,'String',str,'Value',3);
     
-    set(handles.ShowMenu,'String',{'Изображения';'Гистограммы RGB';'Гистограммы HSV'},'Value',1);
+    set(handles.ShowMenu,'String',{'Изображения';'Гистограммы полутонов';'Гистограммы HSV'},'Value',1);
     
 else                        % ЕСЛИ Ч/Б ИЗОБРАЖЕНИЕ
     set(handles.RGBpanel,'Visible','on');
@@ -176,7 +176,7 @@ else                        % ЕСЛИ Ч/Б ИЗОБРАЖЕНИЕ
     	handles.Blue;...
     	handles.ShowButton],'Enable','off');
     
-    set(handles.ShowMenu,'String',{'Изображения';'Гистограммы RGB'},'Value',1);
+    set(handles.ShowMenu,'String',{'Изображения';'Гистограммы полутонов'},'Value',1);
 end
 
 set(handles.Utilits,'Enable','on');
@@ -573,9 +573,9 @@ if size(Noised,4) > 1       % если в списке более 1й обработки, тогда можно что-
 end
 
 
-Assessment = GetAssessment(Original,Temp);
+Assessment = GetAssessment(Original,Temp,1);
 Assessment_F(end+1) = Assessment;
-Assessment = GetAssessment(Original,Original);
+Assessment = GetAssessment(Original,Original,1);
 Assessment_N(end+1) = Assessment;
 
 % вызовем подфункцию, которая нарисует графики и обновить картинки
@@ -680,7 +680,9 @@ switch char(WhatToShow)       % смотрим, что нужно показать
     
     case 'Изображения'
         
-    case 'Гистограммы RGB'
+        % если channel == 0, тогда ch = 1:end? else ch = value
+        
+    case 'Гистограммы полутонов'
         
     case 'Гистограммы HSV'
         
@@ -1020,23 +1022,71 @@ global Filtered;            % отфильтрованное изображение
 global Assessment_N;              % пиковое с/ш зашумленного изображения
 global Assessment_F;              % пиковое с/ш отфильтрованного изображения
 
-% считываем собственное значение и создаем соответствующие объекты в осях
+% считываем собственное значение и вставляем нужное изображение в контейнер
+% оси UserData, затем слайдер выберет нужный канал/изображение и пр.
+
+MenuString = get(handles.ShowMenu,'String');
+WhatToShow = MenuString(get(handles.ShowMenu,'Value'));
 
 switch char(WhatToShow)       % смотрим, что нужно показать
     
     case 'Изображения'
         
-    case 'Гистограммы RGB'
+        handles.OriginalAxes.UserData = Original;
+        
+        handles.uipanel8.Visible = 'on';
+        
+        if ~isempty(Noised)
+            handles.OriginalAxes.UserData = Noised;
+            handles.FiltAxes.UserData = Original;
+        end
+        
+    case 'Гистограммы полутонов'
+        
+        handles.OriginalAxes.UserData = Original; 
+        
+        handles.uipanel8.Visible = 'off';
+        
+        if ~isempty(Noised)~= 1
+            handles.NoiseAxes.UserData = Noised;
+            handles.FiltAxes.UserData = Filtered;
+        end
         
     case 'Гистограммы HSV'
         
+        handles.OriginalAxes.UserData = uint8(255*rgb2hsv(Original));
+        
+        handles.uipanel8.Visible = 'off';
+        
+        if ~isempty(Noised)
+            
+            Im_N = zeros(size(Noised));
+            Im_F = zeros(size(Noised));
+            
+            for x = 1:size(Noised,4)
+                Im_N(:,:,:,x) = uint8(255*rgb2hsv(Noised(:,:,:,x)));
+                Im_F(:,:,:,x) = uint8(255*rgb2hsv(Filtered(:,:,:,x)));
+            end            
+            
+            handles.NoiseAxes.UserData = Im_N;
+            handles.FiltAxes.UserData = Im_F;
+        end
+        
     case 'SSIM-изображения'
+        
+        handles.OriginalAxes.UserData = Original;
+        handles.NoiseAxes.UserData = Assessment_N.SSIM_Image;
+        handles.FiltAxes.UserData = Assessment_F.SSIM_Image;        
+        
+        handles.uipanel8.Visible = 'on';
         
     otherwise
         
-        assert(0,'Строка меня "Показывать" считалась не корректно');
-        
+        assert(0,'Строка меню "Показывать" считалась не корректно');        
 end
+
+ChannelSlider_Callback(hObject, eventdata, handles);
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% МЕНЮ ФИЛЬТРАЦИЯ %%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4466,6 +4516,7 @@ else
     Filtered = Temp_Filtered;
 end
 
+set(findobj('Parent',Wait,'Style','pushbutton'),'Enable','off');    % чтобы пользователь отменой ничего не сбил
 
 for p = 1:size(Filtered,4)
     str{p} = ['Изображение № ' num2str(p)];
@@ -4476,8 +4527,9 @@ waitbar(k/(size(Noises,1)+1),Wait,'Расчет критериев оценки');
 % проведем оценку полученных изображений и округлим ее до сотых
 Assessment_N = [];
 Assessment_F = [];
-Assessment_N = GetAssessment(Original,Noised);
-Assessment_F = GetAssessment(Original,Filtered);
+
+Assessment_N = GetAssessment(Original,Noised,1);
+Assessment_F = GetAssessment(Original,Filtered,1);
 
 % !!!!! удалить перед релизом
 delete(menu_handles.menu);          % закрываем меню-окно
@@ -4490,7 +4542,7 @@ set(handles.Noised,'Enable','on');
 
 if size(Original,3) == 1                % если ч/б изображение
     set(handles.ChannelSlider,'Value',1);
-    set(handles.ShowMenu,'String',{'Изображения';'Гистограммы RGB';'SSIM-изображения'},'Value',1);
+    set(handles.ShowMenu,'String',{'Изображения';'Гистограммы полутонов';'SSIM-изображения'},'Value',1);
 else
     
     set(handles.ChannelSlider,'Value',0);
@@ -4498,7 +4550,7 @@ else
     set(handles.Red,'Value',1);
     set(handles.Green,'Value',2);
     set(handles.Blue,'Value',3);
-    set(handles.ShowMenu,'String',{'Изображения';'Гистограммы RGB';'Гистограммы HSV';'SSIM-изображения'},'Value',1);
+    set(handles.ShowMenu,'String',{'Изображения';'Гистограммы полутонов';'Гистограммы HSV';'SSIM-изображения'},'Value',1);
 end
 
 % если число фильтраций свыше 10, настроим слайдер
@@ -4995,16 +5047,17 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
                 structure = Mask;
             end
             
+            if delta == 0
+                delta = inf;        % будем работать до стабилизации
+            end
+            
             for ch = 1:size(BW_Im,3)            % ДА НАЧНЕТСЯ ЖЕ ОБРАБОТКА
                 
                 if FPM2 < 12      % для фильтров не из bwmorph
                     
-                    if delta == 0
-                        delta = 1000;        % будем работать до 1000 или стабилизации
-                    end
                     n = 1;
                     
-                    while delta >= n
+                    while delta >= n   
                         
                         Im_gauge = BW_Im;
                         
@@ -5041,21 +5094,17 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
                                 
                             case 11              % успех/неудача
                                 BW_Im = bwhitmiss(BW_Im,structure);
+                        end                        
+                        
+                        if BW_Im == Im_gauge        % если изображение не изменилось, выходим из цикла
+                            break;
                         end
                         
                         n = n + 1;
                         
-                        if delta == 0 && BW_Im == Im_gauge        % если изображение не изменилось, выходим из цикла
-                            break;
-                        end
-                        
                     end
                     
                 else            % тут bwmorph, который сам обрабаывает до бесконечности
-                    
-                    if delta == 0
-                        delta = inf;
-                    end
                     
                     switch FPM2
                         case 12              % соединение
@@ -5190,54 +5239,59 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
             end
             
             if delta == 0
-                delta = 1000;
+                delta = inf;        % будем работать до стабилизации
             end
-            n = 1;              % начинаем цикл
+            n = 1;                          % начинаем цикл            
+            Grey_Im = Image;   % задали массив
             
+            % пока число заданных циклов delta не достигнуто 
+            % или изображение не стабилизировалось выполняем цикл
             while delta >= n
                 
-                Im_gauge = Image; % сохраняем предыдущее изображение
+                Im_gauge = Grey_Im;        % если нет стабилизации, запомнили обработанное
                 
-                switch FPM2
+                switch FPM2                    
                     case 1
-                        Grey_Im = imdilate(Image,structure);
+                        Grey_Im = imdilate(Grey_Im,structure);
                     case 2
-                        Grey_Im = imerode(Image,structure);                        
+                        Grey_Im = imerode(Grey_Im,structure);                        
                     case 3
-                        Grey_Im = imopen(Image,structure);
+                        Grey_Im = imopen(Grey_Im,structure);
                     case 4
-                        Grey_Im = imclose(Image,structure);
+                        Grey_Im = imclose(Grey_Im,structure);
                     case 5
-                        Grey_Im = imbothat(Image,structure);
+                        Grey_Im = imbothat(Grey_Im,structure);
                     case 6
-                        Grey_Im = imtophat(Image,structure);
+                        Grey_Im = imtophat(Grey_Im,structure);
                     case 7
-                        Grey_Im = imfill(Image);
+                        Grey_Im = imfill(Grey_Im);
                     case 8
-                        Grey_Im = imclearborder(Image,structure);
+                        Grey_Im = imclearborder(Grey_Im,structure);
                     case 9
-                        Grey_Im = bwperim(Image,structure);
+                        Grey_Im = bwperim(Grey_Im,structure);
                     case 10 
-                        Grey_Im = bwulterode(Image,add,structure);
+                        Grey_Im = bwulterode(Grey_Im,add,structure);
                     case 11
-                        Grey_Im = imextendedmin(Image,alpha/255,structure);
+                        Grey_Im = imextendedmin(Grey_Im,alpha/255,structure);
                     case 12
-                        Grey_Im = imextendedmax(Image,alpha/255,structure);
+                        Grey_Im = imextendedmax(Grey_Im,alpha/255,structure);
                     case 13
-                        Grey_Im = imhmin(Image,alpha/255,structure);
+                        Grey_Im = imhmin(Grey_Im,alpha/255,structure);
                     case 14
-                        Grey_Im = imhmax(Image,alpha/255,structure);
+                        Grey_Im = imhmax(Grey_Im,alpha/255,structure);
                     case 15
-                        Grey_Im = imregionalmin(Image,structure);
+                        Grey_Im = imregionalmin(Grey_Im,structure);
                     case 16
-                        Grey_Im = imregionalmax(Image,structure);
+                        Grey_Im = imregionalmax(Grey_Im,structure);
                 end
                 
-                n = n + 1;      % увеличиваем счетчик
-                    if delta == 0 && Grey_Im == Im_gauge        % если изображение не изменилось, выходим из цикла
-                       break;   % если выбрано "до стабилизации" и произошла стабилизация
-                    end
-            end            
+                if Grey_Im == Im_gauge     % сравнили изменения                  
+                    break;
+                end
+                
+                n = n + 1;              % увеличиваем счетчик   
+                
+            end
             
             Filtered = uint8(Grey_Im*255);
             return;
@@ -6012,7 +6066,7 @@ end
 
 
 % ФУНКЦИЯ ОЦЕНКИ ОРИГИНАЛА И ОБРАБОТАННОГО ИЗОБРАЖЕНИЯ
-function Assessment = GetAssessment(Orig_Im,Im,~)
+function Assessment = GetAssessment(Orig_Im,Im,BuildImages)
 
 % Orig_Im - исходное изображение
 % Im - НАБОР преобразованных изображений
@@ -6102,7 +6156,7 @@ for X = 1:size(Im,4)        % для всех отфильтрованных/зашумленных изображений
     Assessment(X).SNR(1) = sum(SNR)/size(Im,3);
     Assessment(X).PSNR(1) = sum(PSNR)/size(Im,3);
     
-    if nargin == 2      % если нужно считать оценочное изображение
+    if BuildImages == true     % если нужно считать оценочное изображение
         [Assessment(X).SSIM(1), Assessment(X).SSIM_Image] = ssim(Orig_Im,Im(:,:,:,X));
         Assessment(X).SSIM_Image = uint8(127.5*Assessment(X).SSIM_Image + 127.5);        
     else
@@ -6439,10 +6493,7 @@ function ObjectHandle = BuildHist(ax,Image,title_str)
 % проверяем сколько каналов у изображения
 % и назначаем цвет для каждого канала 
 
-if size(Image,3) == 2 || size(Image,4) > 1
-    assert(0,'Image не является изображением');
-    return;
-end
+assert(size(Image,3) ~= 2 && size(Image,4) == 1,'Image не является изображением');
 
 switch size(Image,3)
     case 1      % канал
@@ -6455,7 +6506,7 @@ switch size(Image,3)
         color = colormap(gcf,hsv(size(Image,3))); 
 end
 
-if any(Image(:) < 0)        % если есть отрицательные значения
+if any(Image(:) < 0)        % если есть отрицательные значения (для гистограмм шума)
     nbins = 511;
     binlims = [-255 255];
 else
@@ -7069,7 +7120,7 @@ try
         Im = double(Image(Y0:Y1,X0:X1));     % перевели в дубль фрагмент и исходное изображение
         Orig_Im = double(Original(:,:,get(analyzer_handles.ChannelImageMenu,'Value')));
         
-        Assessment = GetAssessment(Orig_Im,Im,'NumericOnly');
+        Assessment = GetAssessment(Orig_Im,Im,0);
         
         asses_str = ...
             [ {'Математическое ожидание: '};...
