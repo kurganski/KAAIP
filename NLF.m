@@ -61,11 +61,8 @@ end
 % TODO LIST:
 
 %   1) добавить бинарирную пороговую обработку с адаптивным порогом, с. 424
-%   2) добавить сегментацию изображения с. 425-443
-%   5) ускорить билатеральные фильтры
-%   6) полутоновая мофрология и детектор линий Хафа для многоакнальных
-%   изображений полетят!
-%   4) кнопка "удалить позицию не работает"
+%   2) ускорить билатеральные фильтры
+%   3) пороговые фильтры прикрутит hsv и доп слайдеры 
  
 %   8) В мануале сделать инфографикой описание
 
@@ -145,6 +142,8 @@ set([   handles.NoiseAxes;...
 % чистим глобальные переменные
 clear global Noised;
 clear global Filtered;
+setappdata(handles.NoiseAxes,'Image',[]);
+setappdata(handles.FiltAxes,'Image',[]);
 
 if size(Original,3) > 1     % ЕСЛИ ЦВЕТНОЕ ИЗОБРАЖЕНИЕ
     
@@ -170,6 +169,7 @@ if size(Original,3) > 1     % ЕСЛИ ЦВЕТНОЕ ИЗОБРАЖЕНИЕ
     set(handles.ShowMenu,'String',{'Изображения';'Гистограммы полутонов';'Гистограммы HSV'},'Value',1);
     
 else                        % ЕСЛИ Ч/Б ИЗОБРАЖЕНИЕ
+    
     set(handles.RGBpanel,'Visible','on');
     set(handles.ChannelSlider,'Value',1,'Enable','off');
     
@@ -751,11 +751,11 @@ switch char(WhatToShow)       % смотрим, что нужно показать
         HistObject = findobj('Parent',handles.OriginalAxes,'Tag','Hist');
         
         for x = 1:size(Im,3)
-            HistObject(x).Data = Im(:,:,channel(x));
+            HistObject(x).Data = Im(:,:,channel(x));            
         end
         
-        Im = getappdata(handles.NoiseAxes,'Image');        
-
+        Im = getappdata(handles.NoiseAxes,'Image');    
+        
         if ~isempty(Im)
             
             HistObject = findobj('Parent',handles.NoiseAxes,'Tag','Hist');
@@ -773,7 +773,7 @@ switch char(WhatToShow)       % смотрим, что нужно показать
         end      
         
     otherwise        
-        assert(0,'Строка меня "Показывать" считалась не корректно');        
+        assert(0,'Строка меню "Показывать" считалась не корректно');        
 end       
 
   
@@ -1375,12 +1375,23 @@ switch FilterType
         
     case 3          % БИНАРИЗАЦИЯ
         
+        set(menu_handles.FiltParText1,'String','Размер маски');    
+        set(menu_handles.FiltParMenu1,'String',{'3x3','5x5','7x7','9x9','11x11','13x13','15x15','17x17','19x19'});
+            
         set(menu_handles.FiltParText2,'String','Тип');
-        set(menu_handles.FiltParMenu2,'String',{'пороговая','Оцу'}); 
+        set(menu_handles.FiltParMenu2,'String',{'Пороговая','Оцу','Брэдли-Рота','Ниблэка','Кристиана','Бернсена','Саувола'}); 
         
-        set(menu_handles.AlphaSlider,'Min',1,'Max',255,'Value',100,'SliderStep',[1/254 10/254]);
         set(menu_handles.AlphaText,'String','Порог: ');
+        set(menu_handles.AlphaSlider,'Min',1,'Max',255,'Value',100,'SliderStep',[1/254 10/254]);
         set(menu_handles.AlphaValText,'String','100');
+        
+        set(menu_handles.BetaText,'String','k: ');
+        set(menu_handles.BetaSlider,'Min',-1,'Max',1,'Value',0.5,'SliderStep',[0.01/2 0.1/2]);
+        set(menu_handles.BetaValText,'String','0.5');        
+        
+        set(menu_handles.GammaText,'String','R: ');
+        set(menu_handles.GammaSlider,'Min',1,'Max',255,'Value',50,'SliderStep',[1/254 1/254]);
+        set(menu_handles.GammaValText,'String','50'); 
         
     case 4      % МОРФОЛОГИЧЕСКАЯ ОБРАБОТКА (Ч/Б)                 
         
@@ -1462,20 +1473,20 @@ switch FilterType
                                             
         set(menu_handles.FiltParButton1,'String','Задать');
         
-        set(menu_handles.AlphaSlider,'Min',0,'Max',255,'Value',100,'SliderStep',[1/255 10/255]);
         set(menu_handles.AlphaText,'String','Яркость: ');
+        set(menu_handles.AlphaSlider,'Min',0,'Max',255,'Value',100,'SliderStep',[1/255 10/255]);
         set(menu_handles.AlphaValText,'String','100');
         
-        set(menu_handles.BetaSlider,'Min',1,'Max',7,'Value',1,'SliderStep',[1/6 1/6]);
         set(menu_handles.BetaText,'String','Строка: ');
+        set(menu_handles.BetaSlider,'Min',1,'Max',7,'Value',1,'SliderStep',[1/6 1/6]);
         set(menu_handles.BetaValText,'String','1');        
         
-        set(menu_handles.GammaSlider,'Min',1,'Max',7,'Value',1,'SliderStep',[1/6 1/6]);
         set(menu_handles.GammaText,'String','Столбец:');
+        set(menu_handles.GammaSlider,'Min',1,'Max',7,'Value',1,'SliderStep',[1/6 1/6]);
         set(menu_handles.GammaValText,'String','1'); 
         
-        set(menu_handles.DeltaSlider,'Min',0,'Max',1000,'Value',1,'SliderStep',[1/1000 10/1000]);
         set(menu_handles.DeltaText,'String','Кол-во итераций:');
+        set(menu_handles.DeltaSlider,'Min',0,'Max',1000,'Value',1,'SliderStep',[1/1000 10/1000]);
         set(menu_handles.DeltaValText,'String','1');
         
         m = zeros(7);
@@ -2031,6 +2042,7 @@ function FiltParMenu2_Callback(~,~,menu_handles)
 global Original;
 
 switch get(menu_handles.FilterType,'Value')     % тип обработки
+    
     case 2                                      % медианный фильтр
         if get(menu_handles.FiltParMenu2,'Value') == 1
             set(menu_handles.IndentMenu,'String',{'зеркальное','нули'}); 
@@ -2049,18 +2061,92 @@ switch get(menu_handles.FilterType,'Value')     % тип обработки
         
     case 3          % бинаризация
         
-        if get(menu_handles.FiltParMenu2,'Value') == 1
+        switch get(menu_handles.FiltParMenu2,'Value') 
             
-            set([   menu_handles.AlphaSlider;...
+            case 1  % пороговая                
+                
+                set([menu_handles.FiltParText1 menu_handles.FiltParMenu1],'Visible','off');                 
+                set([ ...  
+                    menu_handles.AlphaSlider;...
                     menu_handles.AlphaText;...
-                    menu_handles.AlphaValText],...
-                    'Visible','on');
-        else
-            
-            set([   menu_handles.AlphaSlider;...
+                    menu_handles.AlphaValText...
+                    ],'Visible','on');
+                
+                set([   ...
+                    menu_handles.BetaSlider;...
+                    menu_handles.GammaSlider;...
+                    menu_handles.BetaText;...
+                    menu_handles.GammaText;...
+                    menu_handles.BetaValText;...
+                    menu_handles.GammaValText...
+                    ],'Visible','off');                
+                
+            case 2  % Оцу
+                
+                set([menu_handles.FiltParText1 menu_handles.FiltParMenu1],'Visible','off');                 
+                set([   ...
+                    menu_handles.AlphaSlider;...
+                    menu_handles.BetaSlider;...
+                    menu_handles.GammaSlider;...
                     menu_handles.AlphaText;...
-                    menu_handles.AlphaValText],...
-                    'Visible','off');
+                    menu_handles.BetaText;...
+                    menu_handles.GammaText;...
+                    menu_handles.AlphaValText;...
+                    menu_handles.BetaValText;...
+                    menu_handles.GammaValText...
+                    ],'Visible','off');
+                
+            case {3,4,5}  % Брэдли-Рота, Ниблэка, Кристиана
+                
+                set([menu_handles.FiltParText1 menu_handles.FiltParMenu1],'Visible','on');                                 
+                set([   ...
+                    menu_handles.BetaSlider;...
+                    menu_handles.BetaText;...
+                    menu_handles.BetaValText;...
+                    ],'Visible','on');
+                
+                set([   ...
+                    menu_handles.AlphaSlider;...
+                    menu_handles.GammaSlider;...
+                    menu_handles.AlphaText;...
+                    menu_handles.GammaText;...
+                    menu_handles.AlphaValText;...
+                    menu_handles.GammaValText...
+                    ],'Visible','off');                                
+                
+            case 6  % Бернсена
+                
+                set([menu_handles.FiltParText1 menu_handles.FiltParMenu1],'Visible','on'); 
+                set([   ...
+                    menu_handles.AlphaSlider;...
+                    menu_handles.BetaSlider;...
+                    menu_handles.GammaSlider;...
+                    menu_handles.AlphaText;...
+                    menu_handles.BetaText;...
+                    menu_handles.GammaText;...
+                    menu_handles.AlphaValText;...
+                    menu_handles.BetaValText;...
+                    menu_handles.GammaValText...
+                    ],'Visible','off');                
+                
+            case 7  % Саувола
+                
+                set([menu_handles.FiltParText1 menu_handles.FiltParMenu1],'Visible','on');                  
+                set([ ...  
+                    menu_handles.AlphaSlider;...
+                    menu_handles.AlphaText;...
+                    menu_handles.AlphaValText...
+                    ],'Visible','off');
+                
+                set([   ...
+                    menu_handles.BetaSlider;...
+                    menu_handles.GammaSlider;...
+                    menu_handles.BetaText;...
+                    menu_handles.GammaText;...
+                    menu_handles.BetaValText;...
+                    menu_handles.GammaValText...
+                    ],'Visible','on');
+                
         end
         
     case 4          % морфологическая обработка
@@ -2904,7 +2990,11 @@ B = get(menu_handles.BetaSlider,'Value');
 RewriteTextString = 0;                  % не надо переписывать текстовую строку
 
 switch get(menu_handles.FilterType,'Value')
- 
+    
+    case {3,8,32}       % бинаризация
+        
+        B = round(B*100)/100;           % округляем
+    
     case 4      % морфологическая обработка (ч/б)
         
         switch get(menu_handles.FiltParMenu2,'Value')       % тип обработки
@@ -3026,11 +3116,7 @@ switch get(menu_handles.FilterType,'Value')
         else
             set(menu_handles.AlphaSlider,'Enable','on');
             set(menu_handles.AlphaSlider,'Max',B-1,'SliderStep',[1/(B-1) 10/(B-1)]);
-        end  
-        
-    case {8,32} 
-        
-        B = round(B*100)/100;           % округляем
+        end          
         
     case 33
         
@@ -3064,6 +3150,9 @@ G = get(menu_handles.GammaSlider,'Value');
 
 switch get(menu_handles.FilterType,'Value')         
         
+    case {3,5,7,8,11,25}      % СЛЕПАЯ ОБРАТНАЯ СВЕРТКА    
+         G = round(G);
+         
     case 4
         G = round(G);
         set(menu_handles.GammaSlider,'Value',G);
@@ -3106,10 +3195,7 @@ switch get(menu_handles.FilterType,'Value')
             
             G = [num2str(2*G+1) 'x' num2str(2*G+1)];
         end
-        
-    case {5,7,8,11,25}      % СЛЕПАЯ ОБРАТНАЯ СВЕРТКА    
-         G = round(G);
-         
+                 
     case 9      % ПРЕОБРАЗОВАНИЕ ХАФА
         
         G = round(G*10)/10;
@@ -3517,9 +3603,12 @@ switch Noises(Current,1)     % если шум:
         
 end
 
+%%%%%
 % ВАЖНЫЙ СПИСОК
 % фильтры, которым нужно расширение границ
 IndentNeeded = [2 6 8 11 13 14 19:27];
+%%%%%%%%
+
 
 if any(IndentNeeded == F(Current,1))    % прописываем вариант обработки краев
     Parametrs(Current) = strcat(Parametrs(Current),[' ' char(8594) ' [' IndentStr{F(Current,5)} ']']);
@@ -3566,6 +3655,16 @@ switch F(Current,1)     % если фильтр
                 type = [' (пороговая: ' num2str(F(Current,3)) ')'];
             case 2
                 type = ' (Оцу)';
+            case 3
+                type = [' (Брэдли-Рота: k = ' num2str(F(Current,6)) '),' mask ', зерк.'];
+            case 4
+                type = [' (Ниблэка: k = ' num2str(F(Current,6)) '),' mask ', зерк.'];
+            case 5
+                type = [' (Кристиана: k = ' num2str(F(Current,6)) '),' mask ', зерк.'];
+            case 6
+                type = [' (Бернсена),' mask ', зерк.'];
+            case 7
+                type = [' (Саувола: k = ' num2str(F(Current,6)) ', R = ' num2str(F(Current,7)) '),' mask ', зерк.'];
         end
         
         Parametrs(Current) = strcat(Parametrs(Current),type);
@@ -4148,7 +4247,7 @@ if Nums2del(1) ~= size(Noises,1)              % если выбран не последний пункт с
 end
 
 Noises(Nums2del,:) = [];          % убираем позиции из всех массивов
-Filters(Nums2del,:) = [];      
+Filters(Nums2del) = [];      
 Parametrs(Nums2del) = [];
 
 for i = Nums2del(1) : size(Noises,1)    % во всех следующих строках убавляем порядковый номер
@@ -4470,8 +4569,19 @@ waitbar(k/(size(Noises,1)+1),Wait,'Расчет критериев оценки');
 Assessment_N = [];
 Assessment_F = [];
 
-Assessment_N = GetAssessment(Original,Noised,1);
-Assessment_F = GetAssessment(Original,Filtered,1);
+if menu_handles.BuildSSIMCheck.Value == 1   % если нужо строить SSIM-изоражения
+    
+    BuildSSIM = 1;    
+    ShowMenuString = handles.ShowMenu.String;
+    ShowMenuString{end+1} = 'SSIM-изображения';
+    handles.ShowMenu.String = ShowMenuString;
+    
+else
+    BuildSSIM = 0;    
+end
+
+Assessment_N = GetAssessment(Original,Noised,BuildSSIM);
+Assessment_F = GetAssessment(Original,Filtered,BuildSSIM);
 
 % !!!!! удалить перед релизом
 delete(menu_handles.menu);          % закрываем меню-окно
@@ -4482,18 +4592,17 @@ set(handles.NoisedMenu,'String',str,'Value',1,'Enable','on');
 set(handles.FilteredMenu,'String',str,'Value',1,'Enable','on');
 set(handles.Noised,'Enable','on');
 
-if size(Original,3) == 1                % если ч/б изображение
-    set(handles.ChannelSlider,'Value',1);
-    set(handles.ShowMenu,'String',{'Изображения';'Гистограммы полутонов';'SSIM-изображения'},'Value',1);
-else
-    
-    set(handles.ChannelSlider,'Value',0);
-    set(handles.ChannelString,'String','RGB');
-    set(handles.Red,'Value',1);
-    set(handles.Green,'Value',2);
-    set(handles.Blue,'Value',3);
-    set(handles.ShowMenu,'String',{'Изображения';'Гистограммы полутонов';'Гистограммы HSV';'SSIM-изображения'},'Value',1);
-end
+
+% if size(Original,3) == 1                % если ч/б изображение
+%     set(handles.ChannelSlider,'Value',1);
+% else    
+%     set(handles.ChannelSlider,'Value',0);
+%     set(handles.ChannelString,'String','RGB');
+%     set(handles.Red,'Value',1);
+%     set(handles.Green,'Value',2);
+%     set(handles.Blue,'Value',3);
+%     set(handles.ShowMenu,'String',{'Изображения';'Гистограммы полутонов';'Гистограммы HSV';'SSIM-изображения'},'Value',1);
+% end
 
 % если число фильтраций свыше 10, настроим слайдер
 if size(Noised,4) > 10
@@ -4931,7 +5040,7 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
             
         case 4                  % МОРФОЛОГИЧЕСКАЯ ОБРАБОТКА (Ч/Б)
                                    
-            BW_Im = getBW(Image);          % BW - логическое изображение 
+            BW_Image = getBW(Image);          % BW - логическое изображение 
             
             % определяем параметры обработки
             if FPM2 < 7               % для дилатации...шляп
@@ -4994,7 +5103,9 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
                 delta = inf;        % будем работать до стабилизации
             end
             
-            for ch = 1:size(BW_Im,3)            % ДА НАЧНЕТСЯ ЖЕ ОБРАБОТКА
+            for ch = 1:size(BW_Image,3)            % ДА НАЧНЕТСЯ ЖЕ ОБРАБОТКА
+                
+                BW_Im = BW_Image(:,:,ch);
                 
                 if FPM2 < 12      % для фильтров не из bwmorph
                     
@@ -5085,11 +5196,14 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
                             
                     end
                 end
+                
+                BW_Image(:,:,ch) = BW_Im;
+                
             end
             
-            Filtered = uint8(double(BW_Im)*255); % переводим в 256 оттенков
+            Filtered = uint8(double(BW_Image)*255); % переводим в 256 оттенков
             
-            if size(Image,3) ~= size(BW_Im,3)  % если число каналов вх и вых изображений не совпал
+            if size(Image,3) ~= size(BW_Image,3)  % если число каналов вх и вых изображений не совпал
                 for x = 2:size(Image,3)
                     Filtered(:,:,x) = Filtered(:,:,1);
                 end
@@ -5480,21 +5594,21 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
             
         case 9                  % ПРЕОБРАЗОВАНИЕ ХАФА
             
-            BW = getBW(Image);          % BW - логическое изображение       
-            
+            BW = getBW(Image);          % BW - логическое изображение 
+                            
             for ch = 1:size(BW,3)
-                [H,Theta,Rho] = hough(BW,'RhoResolution',gamma,'Theta',alpha:FPM2:beta);
+                [H,Theta,Rho] = hough(BW(:,:,ch),'RhoResolution',gamma,'Theta',alpha:FPM2:beta);
                 Threshold = max(H(:))*FPM3/100;
                 peaks = houghpeaks(H,theta,'Threshold',Threshold,'NHoodSize',[delta eta]);
-                lines = houghlines(BW,Theta,Rho,peaks,'FillGap',zeta,'MinLength',epsilon);
+                lines = houghlines(BW(:,:,ch),Theta,Rho,peaks,'FillGap',zeta,'MinLength',epsilon);
                 
                 for x = 1:length(lines)
                     
-                    xi = lines(x).point1(1):lines(x).point2(1);     % область значений 
+                    xi = lines(x).point1(1):lines(x).point2(1);     % область значений
                     X = [lines(x).point1(1) lines(x).point2(1)];    % координты точек
                     Y = [lines(x).point1(2) lines(x).point2(2)];
                     
-                    if lines(x).point1(1) == lines(x).point2(1)     
+                    if lines(x).point1(1) == lines(x).point2(1)
                         yi = lines(x).point1(2):lines(x).point2(2);
                         xi = ones(1,size(yi,2));
                     else
@@ -5505,10 +5619,10 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
                         Filtered(yi(i),xi(i),ch) = 1;
                     end
                 end
-            end    
-            
-            if FPM1 == 2      % если нужно вывести STM
-                imtool(H/max(H(:)));
+                
+                if FPM1 == 2      % если нужно вывести STM
+                    imtool(H/max(H(:)));
+                end
             end
             
             Filtered = uint8(Filtered*255); % переводим в 256 оттенков
@@ -6460,10 +6574,10 @@ end
 for ch = 1:size(Image,3)
     ObjectHandle(ch) = histogram(   ax,...
                                     Image(:,:,ch),...
+                                    'DisplayStyle','stairs',...
                                     'NumBins',nbins,...
                                     'BinLimits',binlims,...
                                     'EdgeColor',color(ch,1:3)); 
-%                                     'DisplayStyle','stairs',...
     hold(ax,'on');
 end
 
@@ -6561,10 +6675,11 @@ MaxMask(MaxMask < 2) = 3;
 
 % ФУНКЦИЯ, ВЫДАЮЩАЯ НА ВЫХОДЕ 2D БИНАРНОЕ ИЗОБРАЖЕНИЕ
 function BW = getBW(Image)
+
 % если Image является бинарным (только 0 и макс. значение), тогда просто
 % преобразуем его к виду 0 и 1; иначе проведем бинаризацию Оцу;
 % если все каналы Image одинаковы, тогда размерность BW будет 2D, иначе
-% будет возвращен 3D массив изображений
+% будет возвращен size(Image,3)-мерный массив двухмерных изображений
 
 Image(Image == max(Image(:))) = 1;
 
@@ -6824,314 +6939,309 @@ ColGraphSecondLine = findobj('Parent',analyzer_handles.ColAxes,'Color','g');
 
 Hist = findobj('Parent',analyzer_handles.AreaAxesHist,'EdgeColor','k');
 
-% если пользователь нагрузит окно, то при его закрытии не будет ошибок
-try
 
-    switch get(analyzer_handles.ImageMenu,'Value')
-
-        case 1  % исходное изображение
-
-            set(analyzer_handles.NumderImageMenu,'String','Изображение № 1','Value',1);
-            Image = Original(:,:,get(analyzer_handles.ChannelImageMenu,'Value'));
-
-        case 2  % зашумленное изображение
-
-            set(analyzer_handles.NumderImageMenu,'String',createSTR(size(Noised,4),1));
-            Image = Noised(:,:,get(analyzer_handles.ChannelImageMenu,'Value'),...
-                get(analyzer_handles.NumderImageMenu,'Value'));
-
-        case 3  % отфильтрованное изображение
-
-            set(analyzer_handles.NumderImageMenu,'String',createSTR(size(Filtered,4),1));
-            Image = Filtered(:,:,get(analyzer_handles.ChannelImageMenu,'Value'),...
-                get(analyzer_handles.NumderImageMenu,'Value'));
-    end
+switch get(analyzer_handles.ImageMenu,'Value')
     
-    % СЧИТЫВАЕТ ЗНАЧЕНИЯ УПРАВЛЯЮЩИХ ЭЛЕМЕНТОВ    
-    Y0 = -(round(get(analyzer_handles.Y0_Slider,'Value')));  % считываем координаты новой (Y-ки с инверсией)
-    Y1 = -(round(get(analyzer_handles.Y1_Slider,'Value')));
-    X0 = round(get(analyzer_handles.X0_Slider,'Value'));
-    X1 = round(get(analyzer_handles.X1_Slider,'Value'));
-    Xrow = round(get(analyzer_handles.RowSlider,'Value'));
-    Ystring = -round(get(analyzer_handles.StringSlider,'Value'));
-    ResLevel = double(Image(Ystring,Xrow)*get(analyzer_handles.ResLevelSlider,'Value'));
-    
-    % пишем текст в строки
-    set(analyzer_handles.X0,'String',num2str(X0));
-    set(analyzer_handles.Y0,'String',num2str(Y0));
-    set(analyzer_handles.X1,'String',num2str(X1));
-    set(analyzer_handles.Y1,'String',num2str(Y1));
-
-    
-    % если не эти объекты вызвали, тогда необходима перерисовка -
-    % не загружаем систему, где не надо менять картинку
-    if hObject ~= analyzer_handles.StringSlider &&...
-       hObject ~= analyzer_handles.RowSlider &&...
-       hObject ~= analyzer_handles.ResLevelSlider
-            
-        % по выбранной радиокнопке
-        switch get(analyzer_handles.ROIRadioButton,'Value')     % рисуем область интереса
-            case 1
-                set(Area,'CData',Image(Y0:Y1,X0:X1));
-                
-            case 0
-                Spectre = fft2(Image(Y0:Y1,X0:X1));     % получил спектр области интереса
-                Spectre = fftshift(Spectre);            % центрировал
-                Spectre = abs(Spectre);                 % получил модуль
-                SpectreImage = log(1 + Spectre);        % перевел в логарифм. шкалу, чтобы было видно
-                SpectreImage = uint8(SpectreImage*255/max(SpectreImage(:))); % перевел в 8 бит и нормировал
-                
-                set(Area,'CData',SpectreImage);                             % вставили в ось спектр
-                setappdata(analyzer_handles.AreaAxes,'Spectre',Spectre);    % запомнили ее    
-        end
-    end
-    
-                
-    % отрисовывае графики строк/столбцов по выбранной радиокнопке
-    switch get(analyzer_handles.ROIRadioButton,'Value')
+    case 1  % исходное изображение
         
-        case 1      % для области интереса
+        set(analyzer_handles.NumderImageMenu,'String','Изображение № 1','Value',1);
+        Image = Original(:,:,get(analyzer_handles.ChannelImageMenu,'Value'));
+        
+    case 2  % зашумленное изображение
+        
+        set(analyzer_handles.NumderImageMenu,'String',createSTR(size(Noised,4),1));
+        Image = Noised(:,:,get(analyzer_handles.ChannelImageMenu,'Value'),...
+            get(analyzer_handles.NumderImageMenu,'Value'));
+        
+    case 3  % отфильтрованное изображение
+        
+        set(analyzer_handles.NumderImageMenu,'String',createSTR(size(Filtered,4),1));
+        Image = Filtered(:,:,get(analyzer_handles.ChannelImageMenu,'Value'),...
+            get(analyzer_handles.NumderImageMenu,'Value'));
+end
+
+% СЧИТЫВАЕТ ЗНАЧЕНИЯ УПРАВЛЯЮЩИХ ЭЛЕМЕНТОВ
+Y0 = -(round(get(analyzer_handles.Y0_Slider,'Value')));  % считываем координаты новой (Y-ки с инверсией)
+Y1 = -(round(get(analyzer_handles.Y1_Slider,'Value')));
+X0 = round(get(analyzer_handles.X0_Slider,'Value'));
+X1 = round(get(analyzer_handles.X1_Slider,'Value'));
+Xrow = round(get(analyzer_handles.RowSlider,'Value'));
+Ystring = -round(get(analyzer_handles.StringSlider,'Value'));
+ResLevel = double(Image(Ystring,Xrow)*get(analyzer_handles.ResLevelSlider,'Value'));
+
+% пишем текст в строки
+set(analyzer_handles.X0,'String',num2str(X0));
+set(analyzer_handles.Y0,'String',num2str(Y0));
+set(analyzer_handles.X1,'String',num2str(X1));
+set(analyzer_handles.Y1,'String',num2str(Y1));
+
+
+% если не эти объекты вызвали, тогда необходима перерисовка -
+% не загружаем систему, где не надо менять картинку
+if hObject ~= analyzer_handles.StringSlider &&...
+        hObject ~= analyzer_handles.RowSlider &&...
+        hObject ~= analyzer_handles.ResLevelSlider
+    
+    % по выбранной радиокнопке
+    switch get(analyzer_handles.ROIRadioButton,'Value')     % рисуем область интереса
+        case 1
+            set(Area,'CData',Image(Y0:Y1,X0:X1));
             
-            % если нужно перестраивать графики столбца и строки
-            if hObject ~= analyzer_handles.ResLevelSlider
-                
-                % расписываем текстовые строки
-                set(analyzer_handles.RowNumberText,'String',num2str(Xrow));
-                set(analyzer_handles.StringNumberText,'String',num2str(Ystring));
-                
-                % рисуем график строки
-                set(RowGraph,'XData',X0:X1,'YData',Image(Ystring,X0:X1));
-                xlim(analyzer_handles.RowAxes,[X0-1 X1+1]);
-                set(RowGraphSecondLine,'XData',ones(1,256)*Xrow);
-                ylim(analyzer_handles.RowAxes,[0 260]);
-                title(analyzer_handles.RowAxes,['Значения яркости пикселей в строке № ' num2str(Ystring)]);
-                
-                % рисуем график столбца
-                set(ColGraph,'XData',Y0:Y1,'YData',Image(Y0:Y1,Xrow));
-                xlim(analyzer_handles.ColAxes,[Y0-1 Y1+1]);
-                set(ColGraphSecondLine,'XData',ones(1,256)*Ystring);
-                ylim(analyzer_handles.ColAxes,[0 260]);
-                title(analyzer_handles.ColAxes,['Значения яркости пикселей в столбце № ' num2str(Xrow)]);
+        case 0
+            Spectre = fft2(Image(Y0:Y1,X0:X1));     % получил спектр области интереса
+            Spectre = fftshift(Spectre);            % центрировал
+            Spectre = abs(Spectre);                 % получил модуль
+            SpectreImage = log(1 + Spectre);        % перевел в логарифм. шкалу, чтобы было видно
+            SpectreImage = uint8(SpectreImage*255/max(SpectreImage(:))); % перевел в 8 бит и нормировал
             
-            end
-            
-            % линии значения уровня разреш. способности
-            set(ColGraphFirstLine,'XData',Y0-1:Y1+1,'YData',ones(1,Y1-Y0+3)*ResLevel,'Visible','on');
-            set(RowGraphFirstLine,'XData',X0-1:X1+1,'YData',ones(1,X1-X0+3)*ResLevel,'Visible','on');
-                
-            
-        case 0        % или ее спектра
-            
-            Spectre = getappdata(analyzer_handles.AreaAxes,'Spectre');
+            set(Area,'CData',SpectreImage);                             % вставили в ось спектр
+            setappdata(analyzer_handles.AreaAxes,'Spectre',Spectre);    % запомнили ее
+    end
+end
+
+
+% отрисовывае графики строк/столбцов по выбранной радиокнопке
+switch get(analyzer_handles.ROIRadioButton,'Value')
+    
+    case 1      % для области интереса
+        
+        % если нужно перестраивать графики столбца и строки
+        if hObject ~= analyzer_handles.ResLevelSlider
             
             % расписываем текстовые строки
-            set(analyzer_handles.RowNumberText,'String',num2str(Xrow-X0+1));
-            set(analyzer_handles.StringNumberText,'String',num2str(Ystring-Y0+1));
+            set(analyzer_handles.RowNumberText,'String',num2str(Xrow));
+            set(analyzer_handles.StringNumberText,'String',num2str(Ystring));
             
             % рисуем график строки
-            set(RowGraph,'XData',1:size(Spectre,2),'YData',Spectre(Ystring-Y0+1,:));
-            xlim(analyzer_handles.RowAxes,[1 size(Spectre,2)]);
-            ylim(analyzer_handles.RowAxes,[0 max(Spectre(Ystring-Y0+1,:))]);
-            title(analyzer_handles.RowAxes,['Модуль значений спектра в строке № ' num2str(Ystring-Y0+1)]);
+            set(RowGraph,'XData',X0:X1,'YData',Image(Ystring,X0:X1));
+            xlim(analyzer_handles.RowAxes,[X0-1 X1+1]);
+            set(RowGraphSecondLine,'XData',ones(1,256)*Xrow);
+            ylim(analyzer_handles.RowAxes,[0 260]);
+            title(analyzer_handles.RowAxes,['Значения яркости пикселей в строке № ' num2str(Ystring)]);
             
             % рисуем график столбца
-            set(ColGraph,'XData',1:size(Spectre,1),'YData',Spectre(:,Xrow-X0+1));
-            xlim(analyzer_handles.ColAxes,[1 size(Spectre,1)]);
-            ylim(analyzer_handles.ColAxes,[0 max(Spectre(:,Xrow-X0+1))]);
-            title(analyzer_handles.ColAxes,['Модуль значений спектра в столбце № ' num2str(Xrow-X0+1)]);
+            set(ColGraph,'XData',Y0:Y1,'YData',Image(Y0:Y1,Xrow));
+            xlim(analyzer_handles.ColAxes,[Y0-1 Y1+1]);
+            set(ColGraphSecondLine,'XData',ones(1,256)*Ystring);
+            ylim(analyzer_handles.ColAxes,[0 260]);
+            title(analyzer_handles.ColAxes,['Значения яркости пикселей в столбце № ' num2str(Xrow)]);
             
-            % линии значения уровня разреш. способности
-            set(ColGraphFirstLine,'Visible','off');
-            set(RowGraphFirstLine,'Visible','off');
-    end
-    
-    % рисуем две линии, соответствующие отрисовке строки и столбца
-    set(RowOnArea,'XData',0:X1-X0+2,'YData',ones(1,X1-X0+3)*(Ystring-Y0+1));
-    set(ColOnArea,'XData',ones(1,Y1-Y0+3)*(Xrow-X0+1),'YData',0:Y1-Y0+2);
-    
-    % меняем пределы осей, увеличивая область интереса, чтобы увеличивалось
-    % изображение в оси
-    xlim(analyzer_handles.AreaAxes,[1 X1-X0+1.01]);        
-    ylim(analyzer_handles.AreaAxes,[1 Y1-Y0+1.01]);   
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % строим гистограмму области интереса  
-    set(Hist,'Data',Image(Y0:Y1,X0:X1));    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
-    % обновляем отрисовку
-    drawnow();
-    
-    if get(analyzer_handles.SpectreRadioButton,'Value')    % если строили спектр
+        end
         
-        % то прописываем пустую строку для вывода пользователю и выходим
-        set([analyzer_handles.AssesmentText analyzer_handles.AssesmentValueText],'String','');
-        set(analyzer_handles.text10,'Visible','off');
-        return;
-    end 
+        % линии значения уровня разреш. способности
+        set(ColGraphFirstLine,'XData',Y0-1:Y1+1,'YData',ones(1,Y1-Y0+3)*ResLevel,'Visible','on');
+        set(RowGraphFirstLine,'XData',X0-1:X1+1,'YData',ones(1,X1-X0+3)*ResLevel,'Visible','on');
+        
+        
+    case 0        % или ее спектра
+        
+        Spectre = getappdata(analyzer_handles.AreaAxes,'Spectre');
+        
+        % расписываем текстовые строки
+        set(analyzer_handles.RowNumberText,'String',num2str(Xrow-X0+1));
+        set(analyzer_handles.StringNumberText,'String',num2str(Ystring-Y0+1));
+        
+        % рисуем график строки
+        set(RowGraph,'XData',1:size(Spectre,2),'YData',Spectre(Ystring-Y0+1,:));
+        xlim(analyzer_handles.RowAxes,[1 size(Spectre,2)]);
+        ylim(analyzer_handles.RowAxes,[0 max(Spectre(Ystring-Y0+1,:))]);
+        title(analyzer_handles.RowAxes,['Модуль значений спектра в строке № ' num2str(Ystring-Y0+1)]);
+        
+        % рисуем график столбца
+        set(ColGraph,'XData',1:size(Spectre,1),'YData',Spectre(:,Xrow-X0+1));
+        xlim(analyzer_handles.ColAxes,[1 size(Spectre,1)]);
+        ylim(analyzer_handles.ColAxes,[0 max(Spectre(:,Xrow-X0+1))]);
+        title(analyzer_handles.ColAxes,['Модуль значений спектра в столбце № ' num2str(Xrow-X0+1)]);
+        
+        % линии значения уровня разреш. способности
+        set(ColGraphFirstLine,'Visible','off');
+        set(RowGraphFirstLine,'Visible','off');
+end
+
+% рисуем две линии, соответствующие отрисовке строки и столбца
+set(RowOnArea,'XData',0:X1-X0+2,'YData',ones(1,X1-X0+3)*(Ystring-Y0+1));
+set(ColOnArea,'XData',ones(1,Y1-Y0+3)*(Xrow-X0+1),'YData',0:Y1-Y0+2);
+
+% меняем пределы осей, увеличивая область интереса, чтобы увеличивалось
+% изображение в оси
+xlim(analyzer_handles.AreaAxes,[1 X1-X0+1.01]);
+ylim(analyzer_handles.AreaAxes,[1 Y1-Y0+1.01]);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% строим гистограмму области интереса
+set(Hist,'Data',Image(Y0:Y1,X0:X1));
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% обновляем отрисовку
+drawnow();
+
+if get(analyzer_handles.SpectreRadioButton,'Value')    % если строили спектр
     
+    % то прописываем пустую строку для вывода пользователю и выходим
+    set([analyzer_handles.AssesmentText analyzer_handles.AssesmentValueText],'String','');
+    set(analyzer_handles.text10,'Visible','off');
+    return;
+end
+
 %     disp(['Ystring = ' num2str(Ystring)]); %для тестирования
 %     disp(['Xrow = ' num2str(Xrow)]);
 %     disp(['X0 = ' num2str(X0)]);
 %     disp(['X1 = ' num2str(X1)]);
 %     disp(['Y0 = ' num2str(Y0)]);
-%     disp(['Y1 = ' num2str(Y1)]);    
-    
-    PixBr = Image(Ystring,Xrow);        % яркость пикселя
-    
-    if X0 == X1         % если вместо ряда пиксель, то и не вычислим РС
-        RowRes = 0;
-    else                % разреш. способность в строке
-        RowRes = PointResolution(Image(Ystring,X0:X1),Xrow-X0+1,ResLevel);      
-    end
-    
-    if Y0 == Y1         % если вместо столбца пиксель, то и не вычислим РС
-        ColRes = 0;
-    else                % разреш способность в столбце
-        ColRes = PointResolution(Image(Y0:Y1,Xrow),Ystring-Y0+1,ResLevel);      
-    end
-    
-    % для устранения излишних расчетов, смотрим какой объект вызвал
-    % отрисовку
-    
-    if      hObject ~= analyzer_handles.StringSlider &&...
-            hObject ~= analyzer_handles.RowSlider &&...
-            hObject ~= analyzer_handles.ResLevelSlider
-        
-        % пошли рассчитывать все характеристики
-        Texture = statxture(Image(Y0:Y1,X0:X1));    % характеристики текстуры     
-        InvMoments = abs(log(invmoments(Image(Y0:Y1,X0:X1))));      % расчет инвариантных моментов
-        
-        % расчитав - сохраняем их
-        setappdata(analyzer_handles.ImageAnalyzer,'Texture',Texture);
-        setappdata(analyzer_handles.ImageAnalyzer,'InvMoments',InvMoments);
-        
-    else        % для остальных объектов - только берем и памяти прошлые значения
-        
-        % вызываем ранее рассчитанные
-        Texture = getappdata(analyzer_handles.ImageAnalyzer,'Texture');
-        InvMoments = getappdata(analyzer_handles.ImageAnalyzer,'InvMoments'); 
-        
-    end
-    
-    if get(analyzer_handles.ImageMenu,'Value') == 1     % если исходное изображение
-        % прописываем строку и вставляем в текстовое поле
-        asses_str = ...
-            [ {'Математическое ожидание: '};...
-            {'Среднеквадратическое отклонение: '};...
-            {'Гладкость: '};...
-            {'Третий момент: '};...
-            {'Однородность: '};...
-            {'Энтропия: '};...
-            {'Коэффициент вариации: '};...
-            {' '};...
-            {'1-й инвариантный момент: '};...
-            {'2-й инвариантный момент: '};...
-            {'3-й инвариантный момент: '};...
-            {'4-й инвариантный момент: '};...
-            {'5-й инвариантный момент: '};...
-            {'6-й инвариантный момент: '};...
-            {'7-й инвариантный момент: '};...
-            {' '};...
-            {'Яркость выбранного пикселя: '};...
-            {'Разрешающая способность в строке: '};...
-            {'Разрешающая способность в столбце: '}];        
-        
-        asses_val_str = ...
-            [{num2str(Texture(1))};...
-            {num2str(Texture(2))};...
-            {num2str(Texture(3))};...
-            {num2str(Texture(4))};...
-            {num2str(Texture(5))};...
-            {num2str(Texture(6))};...
-            {num2str(Texture(2)/Texture(1))};...
-            {' '};...
-            {num2str(InvMoments(1))};...
-            {num2str(InvMoments(2))};...
-            {num2str(InvMoments(3))};...
-            {num2str(InvMoments(4))};...
-            {num2str(InvMoments(5))};...
-            {num2str(InvMoments(6))};...
-            {num2str(InvMoments(7))};...
-            {' '};...
-            {num2str(PixBr)};...
-            {num2str(RowRes)};...
-            {num2str(ColRes)}]; 
-        
-    else        % если выбрано зашумленное или отфильтрованное изображение        
-        
-        Im = double(Image(Y0:Y1,X0:X1));     % перевели в дубль фрагмент и исходное изображение
-        Orig_Im = double(Original(:,:,get(analyzer_handles.ChannelImageMenu,'Value')));
-        
-        Assessment = GetAssessment(Orig_Im,Im,0);
-        
-        asses_str = ...
-            [ {'Математическое ожидание: '};...
-            {'Среднеквадратическое отклонение: '};...
-            {'Гладкость: '};...
-            {'Третий момент: '};...
-            {'Однородность: '};...
-            {'Энтропия: '};...
-            {'Коэффициент вариации: '};...
-            {' '};...
-            {'MAE: '};...
-            {'NAE: '};...
-            {'MSE: '};...
-            {'NMSE: '};...
-            {'SNR, дБ: '};...
-            {'PSNR, дБ: '};...
-            {'SSIM: '};...
-            {' '};...
-            {'1-й инвариантный момент: '};...
-            {'2-й инвариантный момент: '};...
-            {'3-й инвариантный момент: '};...
-            {'4-й инвариантный момент: '};...
-            {'5-й инвариантный момент: '};...
-            {'6-й инвариантный момент: '};...
-            {'7-й инвариантный момент: '};...
-            {' '};...
-            {'Яркость выбранного пикселя: '};...
-            {'Разрешающая способность в строке: '};...
-            {'Разрешающая способность в столбце: '}];
-        
-        asses_val_str = ...
-            [{num2str(Texture(1))};...
-            {num2str(Texture(2))};...
-            {num2str(Texture(3))};...
-            {num2str(Texture(4))};...
-            {num2str(Texture(5))};...
-            {num2str(Texture(6))};...
-            {num2str(Texture(2)/Texture(1))};...
-            {' '};...
-            {num2str(Assessment.MAE(1))};...
-            {num2str(Assessment.NAE(1))};...
-            {num2str(Assessment.MSE(1))};...
-            {num2str(Assessment.NMSE(1))};...
-            {num2str(Assessment.SNR(1))};...
-            {num2str(Assessment.PSNR(1))};...
-            {num2str(Assessment.SSIM(1))};...
-            {' '};...
-            {num2str(InvMoments(1))};...
-            {num2str(InvMoments(2))};...
-            {num2str(InvMoments(3))};...
-            {num2str(InvMoments(4))};...
-            {num2str(InvMoments(5))};...
-            {num2str(InvMoments(6))};...
-            {num2str(InvMoments(7))};...
-            {' '};...
-            {num2str(PixBr)};...
-            {num2str(RowRes)};...
-            {num2str(ColRes)}];
-    end
-    
-    % прописываем строку для вывода пользователю
-    set(analyzer_handles.text10,'Visible','on');        % заголовок характеристик
-    set(analyzer_handles.AssesmentText,'String',asses_str,'FontSize',9);
-    set(analyzer_handles.AssesmentValueText,'String',asses_val_str,'FontSize',9);
-    
-catch
-    return;
+%     disp(['Y1 = ' num2str(Y1)]);
+
+PixBr = Image(Ystring,Xrow);        % яркость пикселя
+
+if X0 == X1         % если вместо ряда пиксель, то и не вычислим РС
+    RowRes = 0;
+else                % разреш. способность в строке
+    RowRes = PointResolution(Image(Ystring,X0:X1),Xrow-X0+1,ResLevel);
 end
+
+if Y0 == Y1         % если вместо столбца пиксель, то и не вычислим РС
+    ColRes = 0;
+else                % разреш способность в столбце
+    ColRes = PointResolution(Image(Y0:Y1,Xrow),Ystring-Y0+1,ResLevel);
+end
+
+% для устранения излишних расчетов, смотрим какой объект вызвал
+% отрисовку
+
+if      hObject ~= analyzer_handles.StringSlider &&...
+        hObject ~= analyzer_handles.RowSlider &&...
+        hObject ~= analyzer_handles.ResLevelSlider
+    
+    % пошли рассчитывать все характеристики
+    Texture = statxture(Image(Y0:Y1,X0:X1));    % характеристики текстуры
+    InvMoments = abs(log(invmoments(Image(Y0:Y1,X0:X1))));      % расчет инвариантных моментов
+    
+    % расчитав - сохраняем их
+    setappdata(analyzer_handles.ImageAnalyzer,'Texture',Texture);
+    setappdata(analyzer_handles.ImageAnalyzer,'InvMoments',InvMoments);
+    
+else        % для остальных объектов - только берем и памяти прошлые значения
+    
+    % вызываем ранее рассчитанные
+    Texture = getappdata(analyzer_handles.ImageAnalyzer,'Texture');
+    InvMoments = getappdata(analyzer_handles.ImageAnalyzer,'InvMoments');
+    
+end
+
+if get(analyzer_handles.ImageMenu,'Value') == 1     % если исходное изображение
+    % прописываем строку и вставляем в текстовое поле
+    asses_str = ...
+        [ {'Математическое ожидание: '};...
+        {'Среднеквадратическое отклонение: '};...
+        {'Гладкость: '};...
+        {'Третий момент: '};...
+        {'Однородность: '};...
+        {'Энтропия: '};...
+        {'Коэффициент вариации: '};...
+        {' '};...
+        {'1-й инвариантный момент: '};...
+        {'2-й инвариантный момент: '};...
+        {'3-й инвариантный момент: '};...
+        {'4-й инвариантный момент: '};...
+        {'5-й инвариантный момент: '};...
+        {'6-й инвариантный момент: '};...
+        {'7-й инвариантный момент: '};...
+        {' '};...
+        {'Яркость выбранного пикселя: '};...
+        {'Разрешающая способность в строке: '};...
+        {'Разрешающая способность в столбце: '}];
+    
+    asses_val_str = ...
+        [{num2str(Texture(1))};...
+        {num2str(Texture(2))};...
+        {num2str(Texture(3))};...
+        {num2str(Texture(4))};...
+        {num2str(Texture(5))};...
+        {num2str(Texture(6))};...
+        {num2str(Texture(2)/Texture(1))};...
+        {' '};...
+        {num2str(InvMoments(1))};...
+        {num2str(InvMoments(2))};...
+        {num2str(InvMoments(3))};...
+        {num2str(InvMoments(4))};...
+        {num2str(InvMoments(5))};...
+        {num2str(InvMoments(6))};...
+        {num2str(InvMoments(7))};...
+        {' '};...
+        {num2str(PixBr)};...
+        {num2str(RowRes)};...
+        {num2str(ColRes)}];
+    
+else        % если выбрано зашумленное или отфильтрованное изображение
+    
+    Im = double(Image(Y0:Y1,X0:X1));     % перевели в дубль фрагмент и исходное изображение
+    Orig_Im = double(Original(:,:,get(analyzer_handles.ChannelImageMenu,'Value')));
+    
+    Assessment = GetAssessment(Orig_Im(Y0:Y1,X0:X1),Im,0);
+    
+    asses_str = ...
+        [ {'Математическое ожидание: '};...
+        {'Среднеквадратическое отклонение: '};...
+        {'Гладкость: '};...
+        {'Третий момент: '};...
+        {'Однородность: '};...
+        {'Энтропия: '};...
+        {'Коэффициент вариации: '};...
+        {' '};...
+        {'MAE: '};...
+        {'NAE: '};...
+        {'MSE: '};...
+        {'NMSE: '};...
+        {'SNR, дБ: '};...
+        {'PSNR, дБ: '};...
+        {'SSIM: '};...
+        {' '};...
+        {'1-й инвариантный момент: '};...
+        {'2-й инвариантный момент: '};...
+        {'3-й инвариантный момент: '};...
+        {'4-й инвариантный момент: '};...
+        {'5-й инвариантный момент: '};...
+        {'6-й инвариантный момент: '};...
+        {'7-й инвариантный момент: '};...
+        {' '};...
+        {'Яркость выбранного пикселя: '};...
+        {'Разрешающая способность в строке: '};...
+        {'Разрешающая способность в столбце: '}];
+    
+    asses_val_str = ...
+        [{num2str(Texture(1))};...
+        {num2str(Texture(2))};...
+        {num2str(Texture(3))};...
+        {num2str(Texture(4))};...
+        {num2str(Texture(5))};...
+        {num2str(Texture(6))};...
+        {num2str(Texture(2)/Texture(1))};...
+        {' '};...
+        {num2str(Assessment.MAE(1))};...
+        {num2str(Assessment.NAE(1))};...
+        {num2str(Assessment.MSE(1))};...
+        {num2str(Assessment.NMSE(1))};...
+        {num2str(Assessment.SNR(1))};...
+        {num2str(Assessment.PSNR(1))};...
+        {num2str(Assessment.SSIM(1))};...
+        {' '};...
+        {num2str(InvMoments(1))};...
+        {num2str(InvMoments(2))};...
+        {num2str(InvMoments(3))};...
+        {num2str(InvMoments(4))};...
+        {num2str(InvMoments(5))};...
+        {num2str(InvMoments(6))};...
+        {num2str(InvMoments(7))};...
+        {' '};...
+        {num2str(PixBr)};...
+        {num2str(RowRes)};...
+        {num2str(ColRes)}];
+end
+
+% прописываем строку для вывода пользователю
+set(analyzer_handles.text10,'Visible','on');        % заголовок характеристик
+set(analyzer_handles.AssesmentText,'String',asses_str,'FontSize',9);
+set(analyzer_handles.AssesmentValueText,'String',asses_val_str,'FontSize',9);
+
 
 
 % СЛАЙДЕР Х0
