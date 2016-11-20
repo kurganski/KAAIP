@@ -53,14 +53,9 @@ try
 catch
 end
 
-% перед финалкой :
-%   1) сделать окно загрузки модальным
-%   2) сделать фигуры "NLF", "Menu" и "Analyzer" невидимыми
-%   3) вернуть лестницы в построение гистограмм
 
 % TODO LIST:
 
-%   1) добавить бинарирную пороговую обработку с адаптивным порогом, с. 424
 %   2) ускорить билатеральные фильтры
 %   3) пороговые фильтры прикрутит hsv и доп слайдеры 
  
@@ -197,48 +192,50 @@ imaqtool;
 
 
 % МЕНЮ "ПРОСМОТР" ИСХОДНОГО ИЗОБРАЖЕНИЯ
-function View_Original_Callback(hObject, eventdata, handles)
-
-global Original;                    % оригинал изображения     
+function View_Original_Callback(hObject, ~, handles)
 
 if hObject == handles.View_Filtered(1) || hObject == handles.View_Filtered(2)       % если вызывающая функция была "показать отфильтрованное"
-    Image(:,:,1) = eventdata(:,:,get(handles.Red,'Value'),get(handles.FilteredMenu,'Value'));
-    Image(:,:,2) = eventdata(:,:,get(handles.Green,'Value'),get(handles.FilteredMenu,'Value'));
-    Image(:,:,3) = eventdata(:,:,get(handles.Blue,'Value'),get(handles.FilteredMenu,'Value'));
+    Im = getappdata(handles.FiltAxes,'Image');
+    Image(:,:,1) = Im(:,:,get(handles.Red,'Value'),get(handles.FilteredMenu,'Value'));
+    Image(:,:,2) = Im(:,:,get(handles.Green,'Value'),get(handles.FilteredMenu,'Value'));
+    Image(:,:,3) = Im(:,:,get(handles.Blue,'Value'),get(handles.FilteredMenu,'Value'));
 
 elseif hObject == handles.View_Noised(1)  || hObject == handles.View_Noised(2)     % если вызывающая  функция была "показать зашумленное"
-    Image(:,:,1) = eventdata(:,:,get(handles.Red,'Value'),get(handles.NoisedMenu,'Value'));
-    Image(:,:,2) = eventdata(:,:,get(handles.Green,'Value'),get(handles.NoisedMenu,'Value'));
-    Image(:,:,3) = eventdata(:,:,get(handles.Blue,'Value'),get(handles.NoisedMenu,'Value'));
+    Im = getappdata(handles.NoiseAxes,'Image');
+    Image(:,:,1) = Im(:,:,get(handles.Red,'Value'),get(handles.NoisedMenu,'Value'));
+    Image(:,:,2) = Im(:,:,get(handles.Green,'Value'),get(handles.NoisedMenu,'Value'));
+    Image(:,:,3) = Im(:,:,get(handles.Blue,'Value'),get(handles.NoisedMenu,'Value'));
 
 else                                        % если вызывающая  функция была "показать оригинал"
-    Image(:,:,1) = Original(:,:,get(handles.Red,'Value'));
-    Image(:,:,2) = Original(:,:,get(handles.Green,'Value'));
-    Image(:,:,3) = Original(:,:,get(handles.Blue,'Value'));
+    Im = getappdata(handles.OriginalAxes,'Image');
+    Image(:,:,1) = Im(:,:,get(handles.Red,'Value'));
+    Image(:,:,2) = Im(:,:,get(handles.Green,'Value'));
+    Image(:,:,3) = Im(:,:,get(handles.Blue,'Value'));
 end
 
 imtool(Image);
 
 
 % МЕНЮ "КОПИРОВАТЬ" ИСХОДНОЕ ИЗОБРАЖЕНИЕ В БУФЕР
-function CopyOriginalImage_Callback(hObject, eventdata, handles)
-
-global Original;
+function CopyOriginalImage_Callback(hObject, ~, handles)
         
 if hObject == handles.CopyFiltered(1) || hObject == handles.CopyFiltered(2)       % если вызывающая функция была "показать отфильтрованное"
-    Image(:,:,1) = eventdata(:,:,get(handles.Red,'Value'),get(handles.FilteredMenu,'Value'));
-    Image(:,:,2) = eventdata(:,:,get(handles.Green,'Value'),get(handles.FilteredMenu,'Value'));
-    Image(:,:,3) = eventdata(:,:,get(handles.Blue,'Value'),get(handles.FilteredMenu,'Value'));
+    Im = getappdata(handles.FiltAxes,'Image');
+    Image(:,:,1) = Im(:,:,get(handles.Red,'Value'),get(handles.FilteredMenu,'Value'));
+    Image(:,:,2) = Im(:,:,get(handles.Green,'Value'),get(handles.FilteredMenu,'Value'));
+    Image(:,:,3) = Im(:,:,get(handles.Blue,'Value'),get(handles.FilteredMenu,'Value'));
     
 elseif hObject == handles.CopyNoised(1)  || hObject == handles.CopyNoised(2)     % если вызывающая  функция была "показать зашумленное"
-    Image(:,:,1) = eventdata(:,:,get(handles.Red,'Value'),get(handles.NoisedMenu,'Value'));
-    Image(:,:,2) = eventdata(:,:,get(handles.Green,'Value'),get(handles.NoisedMenu,'Value'));
-    Image(:,:,3) = eventdata(:,:,get(handles.Blue,'Value'),get(handles.NoisedMenu,'Value'));
+    Im = getappdata(handles.NoiseAxes,'Image');
+    Image(:,:,1) = Im(:,:,get(handles.Red,'Value'),get(handles.NoisedMenu,'Value'));
+    Image(:,:,2) = Im(:,:,get(handles.Green,'Value'),get(handles.NoisedMenu,'Value'));
+    Image(:,:,3) = Im(:,:,get(handles.Blue,'Value'),get(handles.NoisedMenu,'Value'));
     
 else
-    Image(:,:,1) = Original(:,:,get(handles.Red,'Value'));
-    Image(:,:,2) = Original(:,:,get(handles.Green,'Value'));
-    Image(:,:,3) = Original(:,:,get(handles.Blue,'Value'));
+    Im = getappdata(handles.OriginalAxes,'Image');
+    Image(:,:,1) = Im(:,:,get(handles.Red,'Value'));
+    Image(:,:,2) = Im(:,:,get(handles.Green,'Value'));
+    Image(:,:,3) = Im(:,:,get(handles.Blue,'Value'));
 end
 
 ClipboardCopyImage(Image);
@@ -294,17 +291,13 @@ ClipboardCopyObject(AH,0);
 % МЕНЮ "ПРОСМОТР" ЗАШУМЛЕННОГО ИЗОБРАЖЕНИЯ
 function View_Noised_Callback(hObject, ~, handles)
 
-global Noised;                           % зашумленный вариант
-
-View_Original_Callback(hObject,Noised,handles);
+View_Original_Callback(hObject,0,handles);
 
 
 % МЕНЮ "КОПИРОВАТЬ" ЗАШУМЛЕННОЕ ИЗОБРАЖЕНИЕ В БУФЕР
 function CopyNoised_Callback(hObject, ~, handles)
 
-global Noised;
-
-CopyOriginalImage_Callback(hObject,Noised,handles);
+CopyOriginalImage_Callback(hObject,0,handles);
 
 
 % МЕНЮ "СОХРАНИТЬ ЗАШУМЛЕННОЕ ИЗОБРАЖЕНИЕ"
@@ -351,17 +344,13 @@ CopyOriginalHist_Callback(hObject, eventdata, handles);
 % МЕНЮ "ПРОСМОТР" ОРИГИНАЛА
 function View_Filtered_Callback(hObject, ~, handles)
 
-global Filtered;                        % отфильтрованное изображение
-
-View_Original_Callback(hObject,Filtered,handles);
+View_Original_Callback(hObject,0,handles);
 
 
 % МЕНЮ "КОПИРОВАТЬ" ОТФИЛЬТРОВАННОЕ ИЗОБРАЖЕНИЕ В БУФЕР
 function CopyFiltered_Callback(hObject, ~, handles)
 
-global Filtered;
-
-CopyOriginalImage_Callback(hObject,Filtered,handles);
+CopyOriginalImage_Callback(hObject,0,handles);
 
 
 % МЕНЮ "СОХРАНИТЬ ОТФИЛЬТРОВАННОЕ ИЗОБРАЖЕНИЕ"
@@ -1119,6 +1108,7 @@ set(menu_handles.SaveMaskXLSX,'Callback',{@SaveMaskXLSX_Callback,menu_handles});
 
 NoiseType_Callback(hObject, eventdata, menu_handles);
 FilterType_Callback(hObject, eventdata, menu_handles);
+Menu.Visible = 'on';
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1376,10 +1366,14 @@ switch FilterType
     case 3          % БИНАРИЗАЦИЯ
         
         set(menu_handles.FiltParText1,'String','Размер маски');    
-        set(menu_handles.FiltParMenu1,'String',{'3x3','5x5','7x7','9x9','11x11','13x13','15x15','17x17','19x19'});
+        set(menu_handles.FiltParMenu1,'String',{'3x3','5x5','7x7','9x9','11x11','13x13','15x15','17x17','19x19',...
+            '21x21','23x23','25x25','27x27','29x29','31x31','33x33','35x35','37x37','39x39','41x41','43x43','45x45',});
             
         set(menu_handles.FiltParText2,'String','Тип');
-        set(menu_handles.FiltParMenu2,'String',{'Пороговая','Оцу','Брэдли-Рота','Ниблэка','Кристиана','Бернсена','Саувола'}); 
+        set(menu_handles.FiltParMenu2,'String',{'С глобальным порогом','Оцу',...
+                                                'Брэдли-Рота','Ниблэка','Кристиана',...
+                                                'Бернсена','Саувола'}); 
+          
         
         set(menu_handles.AlphaText,'String','Порог: ');
         set(menu_handles.AlphaSlider,'Min',1,'Max',255,'Value',100,'SliderStep',[1/254 10/254]);
@@ -4498,6 +4492,7 @@ set(gcf,'Visible','off');
 Wait = waitbar(0,'Обработка изображения № 1',...
     'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
 setappdata(Wait,'canceling',0);
+Wait.WindowStyle = 'modal';
 
 for k = 1:size(Noises,1)
     
@@ -4568,41 +4563,19 @@ waitbar(k/(size(Noises,1)+1),Wait,'Расчет критериев оценки');
 % проведем оценку полученных изображений и округлим ее до сотых
 Assessment_N = [];
 Assessment_F = [];
-
-if menu_handles.BuildSSIMCheck.Value == 1   % если нужо строить SSIM-изоражения
-    
-    BuildSSIM = 1;    
-    ShowMenuString = handles.ShowMenu.String;
-    ShowMenuString{end+1} = 'SSIM-изображения';
-    handles.ShowMenu.String = ShowMenuString;
-    
-else
-    BuildSSIM = 0;    
-end
-
-Assessment_N = GetAssessment(Original,Noised,BuildSSIM);
-Assessment_F = GetAssessment(Original,Filtered,BuildSSIM);
-
-% !!!!! удалить перед релизом
-delete(menu_handles.menu);          % закрываем меню-окно
-delete(Wait);                       % модальное окно закрываем, и пользователь не успеет накосячить
+Assessment_N = GetAssessment(Original,Noised,1);
+Assessment_F = GetAssessment(Original,Filtered,1);
 
 % УСТАНОВКИ ОСНОВНОГО ОКНА
 set(handles.NoisedMenu,'String',str,'Value',1,'Enable','on');
 set(handles.FilteredMenu,'String',str,'Value',1,'Enable','on');
 set(handles.Noised,'Enable','on');
 
-
-% if size(Original,3) == 1                % если ч/б изображение
-%     set(handles.ChannelSlider,'Value',1);
-% else    
-%     set(handles.ChannelSlider,'Value',0);
-%     set(handles.ChannelString,'String','RGB');
-%     set(handles.Red,'Value',1);
-%     set(handles.Green,'Value',2);
-%     set(handles.Blue,'Value',3);
-%     set(handles.ShowMenu,'String',{'Изображения';'Гистограммы полутонов';'Гистограммы HSV';'SSIM-изображения'},'Value',1);
-% end
+ShowMenuString = handles.ShowMenu.String;
+if ~strcmp(ShowMenuString{end},'SSIM-изображения');
+    ShowMenuString{end+1} = 'SSIM-изображения';
+end
+handles.ShowMenu.String = ShowMenuString;
 
 % если число фильтраций свыше 10, настроим слайдер
 if size(Noised,4) > 10
@@ -4640,9 +4613,9 @@ set(handles.ContinueProcessing,'Enable','on');
 if size(Noised,4) > 1       % если в списке более 1й обработки, тогда можно что-то удалять
     set(handles.DeleteListPosition,'Enable','on');
 end
-% !!!! потом вернуть 
-% delete(menu_handles.menu);          % закрываем меню-окно
-% delete(Wait);                       % модальное окно закрываем, и пользователь не успеет накосячить
+
+delete(menu_handles.menu);          % закрываем меню-окно
+delete(Wait);                       % модальное окно закрываем, и пользователь не успеет накосячить
     
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ТАБЛИЦА %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5034,7 +5007,73 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
                         end
                     end
                     
+                case {3,4,5,6,7}      % все оконно-адаптивные методы
+                    
+                    if size(Image,3) == 3           % для RGB
+                        Image = rgb2gray(Image);    % получили полутоновое
+                    end
+                    
+                    for ch = 1:size(Image,3)    % обрабатываем каждый канал как полутоновый
+                        
+                        Im = Image(:,:,ch);
+                        ImCol = image2col(Im,MaskSize,'symmetric');   % столбцы-вектора масок
+                        Col = zeros(size(Im,1)*size(Im,2),1);         % вектор-столбец выходных пикселей
+                        Col = ImCol((MaskElements+1)/2,:)';                        
+                        
+                        switch FPM2
+                            
+                            case 3      % Брэдли-Рота
+                                
+                                Mu = mean(ImCol,1)';
+                                Col(Col >= Mu*(1+beta)) = 1;
+                                Col(Col < Mu*(1+beta)) = 0;
+                                
+                            case 4      % Ниблэка
+                                
+                                Mu = mean(ImCol,1)';
+                                D = (std(ImCol,1).^2)';
+                                T = Mu + D*beta;
+                                Col(Col >= T) = 1;
+                                Col(Col < T) = 0;
+                                
+                                
+                            case 5      % Кристиана
+                                
+                                Mu = mean(ImCol,1)';
+                                D = (std(ImCol,1).^2)';
+                                M = min(Im(:));
+                                R = max(D);
+                                T = Mu - beta.*(1-D./R).*(Mu-M);
+                                Col(Col >= T) = 1;
+                                Col(Col < T) = 0;
+                                
+                            case 6      % Бернсена
+                                
+                                T = ((max(ImCol,[],1) - min(ImCol,[],1)) / 2)';
+                                Col(Col >= T) = 1;
+                                Col(Col < T) = 0;
+                                
+                            case 7      % Саувола
+                                
+                                Mu = mean(ImCol,1)';
+                                D = (std(ImCol,1).^2)';
+                                T = Mu.*(1 - beta.*(1-D./gamma));
+                                Col(Col >= T) = 1;
+                                Col(Col < T) = 0;
+                                
+                        end
+                        
+                        Filtered(:,:,ch) = Col2Filtered(Col,Im);
+                    end
+                    
+            end          
+            
+            if size(Image,3) ~= size(Filtered,3)      % если RGB, тогда скопируем каналы
+                for x = 2:size(Filtered,3)
+                    Filtered(:,:,x) = Filtered(:,:,1);
+                end
             end
+            
             Filtered = uint8(Filtered*255);
             return;
             
@@ -6206,19 +6245,19 @@ for X = 1:size(Im,4)        % для всех отфильтрованных/зашумленных изображений
         
     end
     
+    if BuildImages == false         % если вызвал анализатор, то выходим
+        return;
+    end
+    
     Assessment(X).MAE(1) = sum(MAE)/size(Im,3);      % заполняем структуру оценками
     Assessment(X).NAE(1) = sum(NAE)/size(Im,3);
     Assessment(X).MSE(1) = sum(MSE)/size(Im,3);
     Assessment(X).NMSE(1) = sum(NMSE)/size(Im,3);
     Assessment(X).SNR(1) = sum(SNR)/size(Im,3);
-    Assessment(X).PSNR(1) = sum(PSNR)/size(Im,3);
+    Assessment(X).PSNR(1) = sum(PSNR)/size(Im,3);    
+    [Assessment(X).SSIM(1), Assessment(X).SSIM_Image] = ssim(Orig_Im,Im(:,:,:,X));
     
-    if BuildImages == true     % если нужно считать оценочное изображение
-        [Assessment(X).SSIM(1), Assessment(X).SSIM_Image] = ssim(Orig_Im,Im(:,:,:,X));
-        Assessment(X).SSIM_Image = uint8(127.5*Assessment(X).SSIM_Image + 127.5);        
-    else
-        Assessment(X).SSIM(1) = ssim(Orig_Im,Im(:,:,:,X));
-    end
+    Assessment(X).SSIM_Image = uint8(127.5*Assessment(X).SSIM_Image + 127.5);
 end
 
 
@@ -7216,13 +7255,13 @@ else        % если выбрано зашумленное или отфильтрованное изображение
         {num2str(Texture(6))};...
         {num2str(Texture(2)/Texture(1))};...
         {' '};...
-        {num2str(Assessment.MAE(1))};...
-        {num2str(Assessment.NAE(1))};...
-        {num2str(Assessment.MSE(1))};...
-        {num2str(Assessment.NMSE(1))};...
-        {num2str(Assessment.SNR(1))};...
-        {num2str(Assessment.PSNR(1))};...
-        {num2str(Assessment.SSIM(1))};...
+        {num2str(Assessment.MAE(2))};...
+        {num2str(Assessment.NAE(2))};...
+        {num2str(Assessment.MSE(2))};...
+        {num2str(Assessment.NMSE(2))};...
+        {num2str(Assessment.SNR(2))};...
+        {num2str(Assessment.PSNR(2))};...
+        {num2str(Assessment.SSIM(2))};...
         {' '};...
         {num2str(InvMoments(1))};...
         {num2str(InvMoments(2))};...
@@ -7241,7 +7280,6 @@ end
 set(analyzer_handles.text10,'Visible','on');        % заголовок характеристик
 set(analyzer_handles.AssesmentText,'String',asses_str,'FontSize',9);
 set(analyzer_handles.AssesmentValueText,'String',asses_val_str,'FontSize',9);
-
 
 
 % СЛАЙДЕР Х0
