@@ -89,19 +89,24 @@ end
 
 DotPositions = strfind(FileName,'.');            % считываем точки в названии
 format = FileName(DotPositions(end)+1:end);      % считали формат файла после последней точки
-
-if strcmp(format,'gif')                  % !гифки не читаем
-    h = errordlg('gif формат не поддерживается','KAAIP');
-    set(h, 'WindowStyle', 'modal');
-    return;
-end
+ 
+% if strcmp(format,'gif')                  % !гифки не читаем
+%     h = errordlg('gif формат не поддерживается','KAAIP');
+%     set(h, 'WindowStyle', 'modal');
+%     return;
+% end
 
 try             % пытаемся открыть картинку
-    Temp = imread([PathName FileName]);         % загружаем ее
+    [Temp,colors] = imread([PathName FileName]);         % загружаем ее
 catch           % если файл не смог быть открытым :'(
     h = errordlg('С файлом что-то не так. Откройте другой','KAAIP');
     set(h, 'WindowStyle', 'modal');
     return;
+end
+
+% если картинка индексированная - переводим в 256 оттенков
+if ~isempty(colors)      
+    Temp = 255*ind2rgb(Temp,colors);
 end
 
 Original = [];
