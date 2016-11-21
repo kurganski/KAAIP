@@ -1,10 +1,10 @@
 
-function varargout = NLF(varargin)
+function varargout = KAAIP(varargin)
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
                    'gui_Singleton',  gui_Singleton, ...
-                   'gui_OpeningFcn', @NLF_OpeningFcn, ...
-                   'gui_OutputFcn',  @NLF_OutputFcn, ...
+                   'gui_OpeningFcn', @KAAIP_OpeningFcn, ...
+                   'gui_OutputFcn',  @KAAIP_OutputFcn, ...
                    'gui_LayoutFcn',  [] , ...
                    'gui_Callback',   []);
 if nargin && ischar(varargin{1})
@@ -16,9 +16,9 @@ if nargout
 else
     gui_mainfcn(gui_State, varargin{:});
 end
-function varargout = NLF_OutputFcn(~, ~, handles) 
+function varargout = KAAIP_OutputFcn(~, ~, handles) 
 varargout{1} = handles.output;
-function NLF_CloseRequestFcn(hObject, ~, ~)
+function KAAIP_CloseRequestFcn(hObject, ~, ~)
 
 clear global Original;
 clear global Filtered;
@@ -29,14 +29,14 @@ clear global Noises;              % список параметров зашумления
 clear global Filters;             % список параметров фильтрации
 delete(hObject);
 
-function NLF_OpeningFcn(hObject, ~, handles, varargin)
+function KAAIP_OpeningFcn(hObject, ~, handles, varargin)
 
 handles.output = hObject;
 guidata(hObject, handles);
 scr_res = get(0, 'ScreenSize');     % получили разрешение экрана
-fig = get(handles.NLF,'Position');  % получили координаты окна
+fig = get(handles.KAAIP,'Position');  % получили координаты окна
 % отцентрировали окно
-set(handles.NLF,'Position',[(scr_res(3)-fig(3))/2 (scr_res(4)-fig(4))/2 fig(3) fig(4)]);
+set(handles.KAAIP,'Position',[(scr_res(3)-fig(3))/2 (scr_res(4)-fig(4))/2 fig(3) fig(4)]);
 
 try
     toolboxes = ver();      % считываем наличие тулбоксов
@@ -58,11 +58,13 @@ end
 
 %   2) ускорить билатеральные фильтры
 %   3) пороговые фильтры прикрутит hsv и доп слайдеры 
+%   1) в анализаторе сохранение в тхт сделать
  
 %   8) В мануале сделать инфографикой описание
 
 
 %%%%%%%%%%%%%%%%%%%%%% МЕНЮ ИСХОДНОГО ИЗОБРАЖЕНИЯ %%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 % МЕНЮ "ОТКРЫТЬ"
 function Open_Callback(hObject, eventdata, handles)
@@ -70,6 +72,21 @@ function Open_Callback(hObject, eventdata, handles)
 global Original;                        % оригинал изображения
 global format;
 global Filtered;
+
+if isempty(handles)            % значит неумный человек запустил fig вместо m  
+    
+    warning('off'); %#ok<WNOFF>
+    ok = questdlg({'Вы запустили файл с расширением *.fig вместо расширения *.m.';...
+        'Нажмите "OK", и я все исправлю'},...
+        'KAAIP','OK','modal');
+    
+    if ~isempty(ok) || isempty(ok)
+        close(gcf);
+        run('KAAIP.m');
+        warning('on'); %#ok<WNON>
+        return;
+    end
+end
 
 if ~isempty(Filtered)            % если данные уже есть, создаем вопрос-окно
     answer = questdlg(...
@@ -710,7 +727,7 @@ switch char(WhatToShow)       % смотрим, что нужно показать
                     val = num2str(getfield(Assessment_N,{NMV},Assess,{ch+1}));
                 end
                 
-                title(handles.NoiseAxes,[Assess ' = ' num2str(val) dB]);
+                title(handles.NoiseAxes,[Assess ' = ' num2str(val) dB],'FontSize',10);
             end
             
             Im = getappdata(handles.FiltAxes,'Image');
@@ -727,7 +744,7 @@ switch char(WhatToShow)       % смотрим, что нужно показать
                     val = num2str(getfield(Assessment_F,{FMV},Assess,{ch+1}));
                 end
                 
-                title(handles.FiltAxes,[Assess ' = ' num2str(val) dB]);
+                title(handles.FiltAxes,[Assess ' = ' num2str(val) dB],'FontSize',10);
             end
         end
 
@@ -1218,10 +1235,10 @@ switch  get(menu_handles.NoiseType,'Value')
     case 11         % РАВНОМЕРНЫЙ ШУМ  
         set(menu_handles.A,'String','A =');                      % меняем установки слайдера
         set(menu_handles.text12,'String','0');
-        set(menu_handles.Aslider,'Value',0,'Max',254,'Min',0,'SliderStep',[1/254 10/254]);
+        set(menu_handles.Aslider,'Value',0,'Max',254,'Min',-255,'SliderStep',[1/509 10/509]);
         set(menu_handles.B,'String','B =');                      % меняем установки слайдера
-        set(menu_handles.text13,'String','255');
-        set(menu_handles.Bslider,'Value',255,'Max',255,'Min',1,'SliderStep',[1/254 10/254]);
+        set(menu_handles.text13,'String','100');
+        set(menu_handles.Bslider,'Value',100,'Max',255,'Min',-254,'SliderStep',[1/509 10/509]);
     
     case 12         % ШУМ ПУАССОНА
         
@@ -3645,7 +3662,7 @@ switch F(Current,1)     % если фильтр
                 
         end
         
-        Parametrs(Current) = strcat(Parametrs(Current),[' (' type '), ' mask Ord]);
+        Parametrs(Current) = strcat(Parametrs(Current),[' (' type '),' mask Ord]);
         
     case 3              % бинаризация
         
@@ -4506,7 +4523,16 @@ for k = 1:size(Noises,1)
     
     % если используем предыдущее отфильтрованное изображение
     if Noises(k,4) == 1
-        Im = Temp_Filtered(:,:,:,k-1);
+        
+        try 
+            Im = Temp_Filtered(:,:,:,k-1);
+        catch ME
+            delete(Wait);
+            delete(menu_handles.menu);      % закрываем меню-окно  
+        disp(ME.identifier);          
+            errordlg('Искажение изображения потерпело неудачу. Разбирайтесь, как хотите','KAAIP','modal');
+        end
+        
     else
         Im = Original;
     end
@@ -4526,8 +4552,14 @@ for k = 1:size(Noises,1)
             Noises(k,3));  % зашумили
     end
     
-    
-    Temp_Filtered(:,:,:,k) = Filtration(Temp_Noised(:,:,:,k),Filters(k));
+    try
+        Temp_Filtered(:,:,:,k) = Filtration(Temp_Noised(:,:,:,k),Filters(k));
+    catch ME
+        delete(Wait);
+        delete(menu_handles.menu);      % закрываем меню-окно
+        disp(ME.identifier);
+        errordlg('Обработка изображения потерпела неудачу. Разбирайтесь, как хотите','KAAIP','modal');
+    end
     
     drawnow;         % обновляем значение кнопки отмены, чтобы она работала сразу
     if getappdata(Wait,'canceling') == 1          % если нажали кнопку отмены - выходим из цикла
@@ -7540,7 +7572,7 @@ end
 ImageMenu_Callback(hObject, eventdata, analyzer_handles);
 
 
-% ОТКЛИК СТРОК/СТОЛБЦОВ 
+% ОТКЛИК edit СТРОК/СТОЛБЦОВ 
 function XY_Callback (hObject, ~, analyzer_handles)
     
 H = str2double(get(hObject,'String'));     % считал значение вызываемого поля 
