@@ -56,9 +56,11 @@ end
 
 % TODO LIST:
 
-%   2) ускорить билатеральные фильтры
-%   3) пороговые фильтры прикрутит hsv и доп слайдеры 
-%   1) в анализаторе сохранение в тхт сделать
+%   1) ускорить билатеральные фильтры
+%   2) пороговые фильтры прикрутит hsv и доп слайдеры 
+%   3) в анализаторе сохранение в тхт сделать
+%   4) добавить отображение структурного элемента в морф. бинарной обработке
+%   5) надо как то давать возможность убирать ssim. Он очень долгий
  
 %   8) В мануале сделать инфографикой описание
 
@@ -1269,7 +1271,7 @@ FilterWith_SeventhSlider = 9;
 FilterWith_EigthSlider = 9;
 
 FilterWith_Exp_alpha_Button = [5 6 8 11 33];    % фильтры с кнопками
-FilterWith_Exp_beta_Button = [6 32];        
+FilterWith_Exp_beta_Button = [4 6 32];        
         
 FilterWithIndends = [2 6 8 11 13:14 19:23 24:27];  % фильтры с выбором типа расширения границ
 
@@ -1409,7 +1411,9 @@ switch FilterType
         set(menu_handles.GammaSlider,'Min',1,'Max',255,'Value',50,'SliderStep',[1/254 1/254]);
         set(menu_handles.GammaValText,'String','50'); 
         
-    case 4      % МОРФОЛОГИЧЕСКАЯ ОБРАБОТКА (Ч/Б)                 
+    case 4      % МОРФОЛОГИЧЕСКАЯ ОБРАБОТКА (Ч/Б)     
+        
+        set(menu_handles.FiltParButton2,'String','Показать');            
         
         set(menu_handles.FiltParText2,'String','Операция');
         set(menu_handles.FiltParMenu2,'String',{'Дилатация',...
@@ -2188,7 +2192,8 @@ switch get(menu_handles.FilterType,'Value')     % тип обработки
         switch get(menu_handles.FiltParMenu2,'Value')
             
             case {1,2,3,4,5,6}  % дилатация, эрозия, размыкание, ... верх шляпы
-                                
+                               
+                set(menu_handles.FiltParButton2,'Visible','on','String','Показать');  
                 set(menu_handles.FiltParMenu3,'Value',1);
                 set([menu_handles.FiltParText3 menu_handles.FiltParMenu3],'Visible','on'); 
             
@@ -2569,8 +2574,9 @@ switch get(menu_handles.FilterType,'Value')     % тип обработки
     case 4                  % морфологическая обработка
         
         if get(menu_handles.FiltParMenu2,'Value') < 7
-            Max = floor(min(size(Original,1),size(Original,1))/2)-1;
-            
+            Max = floor(min(size(Original,1),size(Original,1))/2)-1;            
+            set(menu_handles.FiltParButton2,'Visible','on');
+                
             switch get(menu_handles.FiltParMenu3,'Value')
                 
                 case 1      % ромб
@@ -2688,7 +2694,9 @@ switch get(menu_handles.FilterType,'Value')     % тип обработки
                     
                     
                 case 7      % пользовательская
-                    
+                             
+                    set(menu_handles.FiltParButton2,'Visible','off');
+                
                     set(menu_handles.BetaSlider,'Min',1,'Max',4,...
                         'Value',1,'SliderStep',[1/3 1/3]);
                     set(menu_handles.BetaText,'String','Размер матрицы:');
@@ -4420,13 +4428,24 @@ switch get(menu_handles.FilterType,'Value')
     
     case 4              % морфологическая обработка
         
-        Data = get(menu_handles.MaskTable,'Data');      % матрица коэффициентов
-        epsilon = get(menu_handles.EpsilonSlider,'Value');     % целевая строка
-        zeta = get(menu_handles.ZetaSlider,'Value');  % целевой столбец
+        switch get(menu_handles.FiltParMenu2,'Value')
+            
+            case {1,2,3,4,5,6}      % дилатация ...шляпы
+                
+                disp('yep');
+                
+                return;
+                
+            case 11     % успех/неудача
         
-        Data(epsilon,zeta) = beta;                       % заменили
-        set(menu_handles.MaskTable,'Data',Data);        % вставили назад
-        return;
+                Data = get(menu_handles.MaskTable,'Data');      % матрица коэффициентов
+                epsilon = get(menu_handles.EpsilonSlider,'Value');     % целевая строка
+                zeta = get(menu_handles.ZetaSlider,'Value');  % целевой столбец
+                
+                Data(epsilon,zeta) = beta;                       % заменили
+                set(menu_handles.MaskTable,'Data',Data);        % вставили назад
+                return;
+        end
         
     case 6                     % билатеральные фильтры
         
@@ -7660,5 +7679,4 @@ if FileName~=0
         return;
     end
 end
-
 
