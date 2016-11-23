@@ -38,29 +38,34 @@ fig = get(handles.KAAIP,'Position');  % получили координаты окна
 % отцентрировали окно
 set(handles.KAAIP,'Position',[(scr_res(3)-fig(3))/2 (scr_res(4)-fig(4))/2 fig(3) fig(4)]);
 
-try
-    toolboxes = ver();      % считываем наличие тулбоксов
-    for i = 1:size(toolboxes,2)
-        % если есть тулбокс параллельных вычислений
-        if strcmp('Image Acquisition Toolbox',toolboxes(i).Name) == 1
-            CamAdaptors = imaqhwinfo('winvideo');   % считываем подключенные камеры системы виндовоз
-            if ~isempty(CamAdaptors.DeviceIDs)      % если подключена хоть одна
+
+
+toolboxes = ver();      % считываем наличие тулбоксов
+for i = 1:size(toolboxes,2)
+    
+    if strcmp('Image Acquisition Toolbox',toolboxes(i).Name) == 1
+        
+        try
+            CamAdaptors = imaqhwinfo('winvideo');                   % считываем подключенные камеры системы виндовоз
+            if ~isempty(CamAdaptors.DeviceIDs)                      % если подключена хоть одна
                 set(handles.ImageAcquisitionMenu,'Enable','on');    % меню доступно
             end
+        catch
         end
     end
-    
-catch
 end
-
 
 % TODO LIST:
 
 %   1) ускорить билатеральные фильтры
-%   2) пороговые фильтры прикрутит hsv и доп слайдеры 
-%   3) в анализаторе сохранение в тхт сделать
-%   4) добавить отображение структурного элемента в морф. бинарной обработке
+%   2) пороговые фильтры: прикрутит hsv и доп. слайдеры 
 %   5) надо как то давать возможность убирать ssim. Он очень долгий
+%   3) шумы экспоненциальный и Рэлея проверить!
+%   4) проверить как поведут себя все фильтры если на входе bw из 256
+%       оттенков
+%   6) проверить что происходит если убирать расширение при сохранении
+%       файлов
+%   7) мин радиус для поиска = 10. Что будет если взять изображение 9х9
  
 %   8) В мануале сделать инфографикой описание
 
@@ -75,20 +80,49 @@ global Original;                        % оригинал изображения
 global format;
 global Filtered;
 
+%%%%%%%%%%%%% ПРОВЕРКИ
+
 if isempty(handles)            % значит неумный человек запустил fig вместо m  
     
     warning('off'); %#ok<WNOFF>
     ok = questdlg({'Вы запустили файл с расширением *.fig вместо расширения *.m.';...
-        'Нажмите "OK", и я все исправлю'},...
+        'Нажмите "OK", и все будет хорошо'},...
         'KAAIP','OK','modal');
     
-    if ~isempty(ok) || isempty(ok)
+    % сюда зайдет в любом случае, цикл нужен, чтобы дождаться ответа
+    if ~isempty(ok) || isempty(ok)      
         close(gcf);
         run('KAAIP.m');
         warning('on'); %#ok<WNON>
         return;
     end
 end
+
+toolboxes = ver();          % считываем наличие тулбоксов
+good = false;
+for i = 1:size(toolboxes,2) % проходимся по каждому
+    
+    if strcmp('Image Processing Toolbox',toolboxes(i).Name) == 1
+        good = true;
+        break;      % если такой тулбокс есть, то все ок        
+    end    
+end
+
+if ~good
+    warning('off'); %#ok<WNOFF>
+    ok = questdlg({ 'Ваша версия Matab не содержит необходимого расширения "Image Processing Toolbox", но вы держитесь здесь';...
+                    'Приложение будет закрыто. Вам всего доброго, хорошего настроения и здоровья.';
+                    'С установкой расширения все будет хорошо!'},'KAAIP','OK','modal');
+    
+    if ~isempty(ok) || isempty(ok)
+        close(gcf);
+        warning('on'); %#ok<WNON>
+        return;
+    end
+end
+
+
+%%%%%%%%% ЗДЕСЬ УЖЕ ПЫТАЕМСЯ ОТКРЫТЬ
 
 if ~isempty(Filtered)            % если данные уже есть, создаем вопрос-окно
     answer = questdlg(...
@@ -108,12 +142,6 @@ end
 
 DotPositions = strfind(FileName,'.');            % считываем точки в названии
 format = FileName(DotPositions(end)+1:end);      % считали формат файла после последней точки
- 
-% if strcmp(format,'gif')                  % !гифки не читаем
-%     h = errordlg('gif формат не поддерживается','KAAIP');
-%     set(h, 'WindowStyle', 'modal');
-%     return;
-% end
 
 try             % пытаемся открыть картинку
     [Temp,colors] = imread([PathName FileName]);         % загружаем ее
@@ -1069,7 +1097,6 @@ scr_res = get(0, 'ScreenSize');             % считываем разрешение экрана и окна
 fig = get(Menu,'Position');         % меняем позицию окна
 set(Menu,   'Position',[(scr_res(3)-fig(3))/2 (scr_res(4)-fig(4))/2 fig(3) fig(4)],...
             'CloseRequestFcn','delete(gcf);'); 
-
         
 % а ежели нужно продолжить обработку - запоминаем сей факт
 if hObject == handles.ContinueProcessing
@@ -1135,6 +1162,52 @@ FilterType_Callback(hObject, eventdata, menu_handles);
 Menu.Visible = 'on';
 
 
+toolboxes = ver();          % считываем наличие тулбоксов
+good = false;
+for i = 1:size(toolboxes,2) % проходимся по каждому
+
+    if strcmp('Statistics Toolbox',toolboxes(i).Name) == 1
+        good = true;
+        break;      % если такой тулбокс есть, то все ок
+    end
+end
+
+if ~good
+    str = {...
+        'Искажение отсутствует';
+        'Нормальный шум';
+        'Шум Пуассона';
+        'Шум Лапласа';
+        'Равномерный шум';
+        'Спекл-шум';
+        'Шум "соль-перец"';
+        'Шум "соль"';
+        'Шум "перец"';
+        'Смазывание'
+        };
+    set(menu_handles.NoiseType,'String',str);
+    errordlg({  'Ваша версия Matab не содержит расширение "Statistics Toolbox".';...
+                'В списке искажений экспоненциальный шум и шум Рэлея недоступны'},'KAAIP','modal');
+else
+    str = {...
+        'Искажение отсутствует';
+        'Нормальный шум';
+        'Шум Пуассона';
+        'Шум Лапласа';
+        'Равномерный шум';
+        'Спекл-шум';
+        'Шум "соль-перец"';
+        'Шум "соль"';
+        'Шум "перец"';
+        'Смазывание';
+        'Шум Рэлея';
+        'Экспоненциальный шум'...
+        };
+    set(menu_handles.NoiseType,'String',str);
+    
+end
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%% ФУНКЦИИ ОКНА "MENU" %%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1152,9 +1225,9 @@ global Original;            % исходное изображение
 
 NoiseType = get(menu_handles.NoiseType,'Value');     % считываем номер выбранного шума
 
-NoiseWithHist = [11 2 3 4 5];            % номера шумов, для кот. строим гистограмму
+NoiseWithHist = [2 4 5 11 12];            % номера шумов, для кот. строим гистограмму
 NoiseWith_A = [6 7 8 9 10];           % ----//-----, с параметром А
-NoiseWith_B = [4 2 10 11];            % ----//-----, с параметром В
+NoiseWith_B = [2 4 5 10];            % ----//-----, с параметром В
 
 % прячем слайдеры и тексты
 set([menu_handles.A;...
@@ -1197,10 +1270,7 @@ switch  get(menu_handles.NoiseType,'Value')
         set(menu_handles.text13,'String','0');
         set(menu_handles.Bslider,'Value',0,'Max',255,'Min',-255,'SliderStep',[1/510 10/510]);  
         
-    case 3          % ЭКСПОНЕНЦИАЛЬНЫЙ ШУМ    
-        set(menu_handles.A,'String',[char(955) ' = ']);       % меняем установки слайдера
-        set(menu_handles.text12,'String','1');
-        set(menu_handles.Aslider,'Value',1,'Max',40,'Min',1,'SliderStep',[1/39 10/39]);
+    case 3          % ШУМ ПУАССОНА
           
     case 4          %  ЛАПЛАСА ШУМ
         set(menu_handles.A,'String',[char(945) ' = ']);       % меняем установки слайдера
@@ -1208,12 +1278,15 @@ switch  get(menu_handles.NoiseType,'Value')
         set(menu_handles.Aslider,'Value',1,'Max',40,'Min',1,'SliderStep',[1/39 10/39]);
         set(menu_handles.B,'String',[char(956) ' = ']);                      % меняем установки слайдера
         set(menu_handles.text13,'String','0');
-        set(menu_handles.Bslider,'Value',0,'Max',255,'Min',-255,'SliderStep',[1/510 1/510]);
+        set(menu_handles.Bslider,'Value',0,'Max',255,'Min',-255,'SliderStep',[1/510 10/510]);
         
-    case 5          % РЭЛЕЯ ШУМ 
-        set(menu_handles.A,'String',[char(963) ' = ']);       % меняем установки слайдера
-        set(menu_handles.text12,'String','0.5');
-        set(menu_handles.Aslider,'Value',0.5,'Max',1,'Min',0.01,'SliderStep',[0.01/0.99 0.01/0.99]);
+    case 5         % РАВНОМЕРНЫЙ ШУМ  
+        set(menu_handles.A,'String','A =');                      % меняем установки слайдера
+        set(menu_handles.text12,'String','0');
+        set(menu_handles.Aslider,'Value',0,'Max',254,'Min',-255,'SliderStep',[1/509 10/509]);
+        set(menu_handles.B,'String','B =');                      % меняем установки слайдера
+        set(menu_handles.text13,'String','100');
+        set(menu_handles.Bslider,'Value',100,'Max',255,'Min',-254,'SliderStep',[1/509 10/509]);         
         
     case 6          % СПЕКЛ-ШУМ 
         set(menu_handles.A,'String',[char(963) char(178) ' = ']);       % меняем установки слайдера
@@ -1229,21 +1302,20 @@ switch  get(menu_handles.NoiseType,'Value')
         set(menu_handles.A,'String','Число точек: ');
         set(menu_handles.text12,'String','10');
         set(menu_handles.Aslider,'Value',10,'Max',max(size(Original)),'Min',1,...
-            'SliderStep',[1/(max(size(Original))-1) 1/(max(size(Original))-1)]); 
+            'SliderStep',[1/(max(size(Original))-1) 10/(max(size(Original))-1)]); 
         set(menu_handles.B,'String',['Угол,' char(186) ': ']);                      % меняем установки слайдера
         set(menu_handles.text13,'String','0');
-        set(menu_handles.Bslider,'Value',0,'Max',360,'Min',0,'SliderStep',[1/360 10/360]);
-    
-    case 11         % РАВНОМЕРНЫЙ ШУМ  
-        set(menu_handles.A,'String','A =');                      % меняем установки слайдера
-        set(menu_handles.text12,'String','0');
-        set(menu_handles.Aslider,'Value',0,'Max',254,'Min',-255,'SliderStep',[1/509 10/509]);
-        set(menu_handles.B,'String','B =');                      % меняем установки слайдера
-        set(menu_handles.text13,'String','100');
-        set(menu_handles.Bslider,'Value',100,'Max',255,'Min',-254,'SliderStep',[1/509 10/509]);
-    
-    case 12         % ШУМ ПУАССОНА
+        set(menu_handles.Bslider,'Value',0,'Max',360,'Min',0,'SliderStep',[1/360 10/360]);    
         
+    case 11          % РЭЛЕЯ ШУМ 
+        set(menu_handles.A,'String',[char(963) ' = ']);       % меняем установки слайдера
+        set(menu_handles.text12,'String','0.5');
+        set(menu_handles.Aslider,'Value',0.5,'Max',1,'Min',0.01,'SliderStep',[0.01/0.99 0.1/0.99]);  
+        
+    case 12          % ЭКСПОНЕНЦИАЛЬНЫЙ ШУМ    
+        set(menu_handles.A,'String',[char(955) ' = ']);       % меняем установки слайдера
+        set(menu_handles.text12,'String','1');
+        set(menu_handles.Aslider,'Value',1,'Max',40,'Min',1,'SliderStep',[1/39 10/39]);
 end
 
 
@@ -1257,17 +1329,17 @@ FilterType = get(menu_handles.FilterType,'Value');   %считываем значение выбранн
 FilterWithMaskTable = [2 5 11];                         % номера фильтров, которым нужно 1я таблица
 FilterWithMaskTable1 = 5;                         % номера фильтров, которым нужно 2я таблица
 FilterWithMenu1 = [2 6 8 9 11 13:14 19 22 24:27];
-FilterWithMenu2 = [2:6 7 9 10 11 14 25:26];                       % номера фильтров, которым нужно 2е меню
-FilterWithMenu3 = [4 9 15 17 18 25 29:32];        % номера фильтров, которым нужно 3е меню
+FilterWithMenu2 = [2:6 7 9 10 11 14 25:26 34];                       % номера фильтров, которым нужно 2е меню
+FilterWithMenu3 = [4 9 15 17 18 25 29:32 34];        % номера фильтров, которым нужно 3е меню
 
                                                 % номера фильтров, которым нужны слайдеры  
 FilterWith_FirstSlider = [3 5:9 10:12 13 15:18 20:23 24:27 29:33];        
-FilterWith_SecondSlider = [4 5:9 10:12 16 30 32 33];      
-FilterWith_ThirdSlider = [5 7:11 16 33];
-FilterWith_FourthSlider = [4 5 7:10 33];
+FilterWith_SecondSlider = [4 5:9 10:12 16 30 32:34];      
+FilterWith_ThirdSlider = [5 7:11 16 33 34];
+FilterWith_FourthSlider = [4 5 7:10 33 34];
 FilterWith_FifthSlider = [8 9 33];
 FilterWith_SixthSlider = 9;
-FilterWith_SeventhSlider = 9;
+FilterWith_SeventhSlider = [9 34];
 FilterWith_EigthSlider = 9;
 
 FilterWith_Exp_alpha_Button = [5 6 8 11 33];    % фильтры с кнопками
@@ -1884,7 +1956,8 @@ switch FilterType
         set(menu_handles.AlphaSlider,'Min',1,'Max',25,'Value',1,'SliderStep',[1/24 10/24]);
         set(menu_handles.AlphaValText,'String','1'); 
          
-    case 28                 % СЕГМЕНТАЦИЯ
+    case 28                 % ФИЛЬТРЫ ЛДОКАЛЬНЫХ СТАТИСТИК
+        
         
     case 29                 % ПОРОГОВЫЙ
         
@@ -1921,8 +1994,7 @@ switch FilterType
             set([menu_handles.FiltParMenu3 menu_handles.FiltParText3],'Visible','off');
         end
         
-    case 32             % КВАНТОВАНИЕ
-        
+    case 32             % КВАНТОВАНИЕ        
         
         set(menu_handles.AlphaSlider,'Min',1,'Max',7,'Value',4,'SliderStep',[1/6 1/6]);
         set(menu_handles.AlphaValText,'String','4'); 
@@ -1964,6 +2036,34 @@ switch FilterType
         
         set(menu_handles.FiltParButton1,'String','Iвых(Iвх)');
         
+    case 34         % ДЕТЕКТОР ОКРУЖНОСТЕЙ        
+        
+        set(menu_handles.FiltParText2,'String','Алгоритм');
+        set(menu_handles.FiltParMenu2,'Value',1,'String',{'Хафа';'Атертона и Кирбисона'});
+        
+        set(menu_handles.FiltParText3,'String','Цели');
+        set(menu_handles.FiltParMenu3,'Value',1,'String',{'Темнее фона';'Светлее фона'});
+        
+        set(menu_handles.BetaText,'String','Чувствительсность: ');
+        set(menu_handles.BetaSlider,'Min',0.01,'Max',1,'Value',0.5,'SliderStep',[0.01/0.99 0.1/0.99]);
+        set(menu_handles.BetaValText,'String','0.5'); 
+        
+        set(menu_handles.GammaText,'String','Градиентный порог: ');
+        set(menu_handles.GammaSlider,'Min',1,'Max',255,'Value',100,'SliderStep',[1/254 10/254]);
+        set(menu_handles.GammaValText,'String','100');
+        
+        MS = min(size(Original,2),size(Original,1));
+        if MS <= 10
+           MS = 11; 
+        end
+        
+        set(menu_handles.DeltaText,'String','Целевой радиус: ');        
+        set(menu_handles.DeltaSlider,'Min',10,'Max',MS,'Value',10,...
+                                    'SliderStep',[1/(MS-2) 10/(MS-2)]);
+        set(menu_handles.DeltaValText,'String',['10' char(8804) 'R' char(8804) '11']);
+        
+        set(menu_handles.EtaSlider,'Min',10,'Max',MS,'Value',11,...
+                                    'SliderStep',[1/(MS-2) 10/(MS-2)]); 
 end
 
 
@@ -2561,6 +2661,25 @@ switch get(menu_handles.FilterType,'Value')     % тип обработки
                     menu_handles.BetaValText;...
                     ],'Visible','on');
         end
+        
+    case 34     % детектор окружностей
+        
+        switch get(menu_handles.FiltParMenu2,'Value')
+            case 1      % алгоритм хафа
+                
+                set([  ...
+                    menu_handles.BetaSlider;...
+                    menu_handles.BetaText;...
+                    menu_handles.BetaValText;...
+                    ],'Visible','on');
+            case 2
+                set([  ...
+                    menu_handles.BetaSlider;...
+                    menu_handles.BetaText;...
+                    menu_handles.BetaValText;...
+                    ],'Visible','off');
+                
+        end
 end
 
 
@@ -2807,13 +2926,13 @@ A = get(menu_handles.Aslider,'Value');          % ПОЛУЧИЛИ ЗНАЧЕНИЕ СЛАЙДЕРА
         
 switch get(menu_handles.NoiseType,'Value');     % считываем номер выбранного шума  
     
-    case {2,3,4,6,7,8,9,10}          % НОРМАЛЬНЫЙ,ЭКСПОНЕНЦИАЛЬНЫЙ,ЛАПЛАСА,СПЕКЛ,РАЗМЫТИЕ ШУМ
+    case {2,4,6,7,8,9,10,12}          % НОРМАЛЬНЫЙ,ЭКСПОНЕНЦИАЛЬНЫЙ,ЛАПЛАСА,СПЕКЛ,РАЗМЫТИЕ ШУМ
         A = round(A);
         
-    case 5                      % РЭЛЕЯ ШУМ
+    case 11                      % РЭЛЕЯ ШУМ
         A = round(A*100)/100;
         
-    case 11         % РАВНОМЕРНЫЙ ШУМ
+    case 5         % РАВНОМЕРНЫЙ ШУМ
         
         A = round(get(menu_handles.Aslider,'Value'));
         set(menu_handles.Aslider,'Value',A);
@@ -2823,7 +2942,7 @@ switch get(menu_handles.NoiseType,'Value');     % считываем номер выбранного шум
             set(menu_handles.Bslider,'Enable','off');
         else
             set(menu_handles.Bslider,'Enable','on')
-            set(menu_handles.Bslider,'Min',A+1,'SliderStep',[1/(B_max-A-1) 1/(B_max-A-1)]);
+            set(menu_handles.Bslider,'Min',A+1,'SliderStep',[1/(B_max-A-1) 10/(B_max-A-1)]);
         end        
         
 end
@@ -2842,7 +2961,7 @@ switch get(menu_handles.NoiseType,'Value');     % считываем номер выбранного шум
     case {2,4,10}           % НОРМАЛЬНЫЙ,ЛАПЛАСА,РАЗМЫТИЕ ШУМ  
         B = round(B);
         
-    case 11                 % РАВНОМЕРНЫЙ ШУМ
+    case 5                 % РАВНОМЕРНЫЙ ШУМ
         
         B = round(get(menu_handles.Bslider,'Value'));
         set(menu_handles.Bslider,'Value',B);
@@ -2852,7 +2971,7 @@ switch get(menu_handles.NoiseType,'Value');     % считываем номер выбранного шум
             set(menu_handles.Aslider,'Enable','off');
         else
             set(menu_handles.Aslider,'Enable','on');
-            set(menu_handles.Aslider,'Max',B-1,'SliderStep',[1/(B-A_min-1) 1/(B-A_min-1)]);
+            set(menu_handles.Aslider,'Max',B-1,'SliderStep',[1/(B-A_min-1) 10/(B-A_min-1)]);
         end
         
 end
@@ -3015,7 +3134,7 @@ RewriteTextString = 0;                  % не надо переписывать текстовую строку
 
 switch get(menu_handles.FilterType,'Value')
     
-    case {3,8,32}       % бинаризация
+    case {3,8,32,34}       % бинаризация
         
         B = round(B*100)/100;           % округляем
     
@@ -3174,7 +3293,7 @@ G = get(menu_handles.GammaSlider,'Value');
 
 switch get(menu_handles.FilterType,'Value')         
         
-    case {3,5,7,8,11,25}      % СЛЕПАЯ ОБРАТНАЯ СВЕРТКА    
+    case {3,5,7,8,11,25,34}      % СЛЕПАЯ ОБРАТНАЯ СВЕРТКА    
          G = round(G);
          
     case 4
@@ -3331,6 +3450,17 @@ switch get(menu_handles.FilterType,'Value')
             set(menu_handles.EpsilonSlider,'Enable','on');      % иначе меняем пределы второго слайдера
             set(menu_handles.EpsilonSlider,'Min',D+1,'SliderStep',[1/(255-D-1) 10/(255-D-1)]);
         end
+        
+    case 34
+        D = round(D);           % округляем 
+        Et = get(menu_handles.EtaSlider,'Value');
+        if D >= Et
+            D = Et;
+        end
+        
+        set(menu_handles.DeltaSlider,'Value',D);
+        set(menu_handles.DeltaValText,'String',[num2str(D) char(8804) 'R' char(8804) num2str(Et)]);
+        return;
 end
 
 if isnumeric(D) == 1
@@ -3427,6 +3557,19 @@ switch get(menu_handles.FilterType,'Value')
          
          set(menu_handles.EtaSlider,'Value',Et);
          set(menu_handles.DeltaValText,'String',[num2str(D) 'x' num2str(Et)]);
+         return;
+         
+    case 34         % детектор окружностей
+        
+         Et = round(Et);   
+         D = get(menu_handles.DeltaSlider,'Value'); 
+         
+         if Et <= D
+             Et = D;
+         end
+         
+         set(menu_handles.EtaSlider,'Value',Et);
+         set(menu_handles.DeltaValText,'String',[num2str(D) char(8804) 'R' char(8804) num2str(Et)]);
          return;
 end
 
@@ -4242,6 +4385,24 @@ switch F(Current,1)     % если фильтр
         
         Parametrs(Current) = strcat(Parametrs(Current),...
             [', ' char(947) ' = ' num2str(F(Current,3)) ' (' num2str(F(Current,6)) ' | ' num2str(F(Current,7)) ' :: ' num2str(F(Current,8)) ' | ' num2str(F(Current,9)) ')']);
+    
+    case 34     % детектор окружностей
+        
+        if F(Current,10) == 1
+            type = ['(Хафа): чувств-ть: ' num2str(F(Current,6)) ','];
+        elseif F(Current,10) == 2
+            type = '(Атертона и Кирбисона):';            
+        end
+        
+        if F(Current,4) == 1
+            targets = ' цели темнее фона,';
+        elseif F(Current,4) == 2
+            targets = ' цели светлее фона,';            
+        end        
+        
+        Parametrs(Current) = strcat(Parametrs(Current),...
+            [type targets ' порог: ' num2str(F(Current,7)) ', '...
+            num2str(F(Current,8)) char(8804) 'R' char(8804) num2str(F(Current,12))]);
         
 end
 
@@ -4423,6 +4584,7 @@ function FiltParButton2_Callback(~, ~, menu_handles)
 
 scr_res = get(0, 'ScreenSize');
 beta = get(menu_handles.BetaSlider,'Value');
+gamma = get(menu_handles.GammaSlider,'Value');
 
 switch get(menu_handles.FilterType,'Value') 
     
@@ -4432,8 +4594,24 @@ switch get(menu_handles.FilterType,'Value')
             
             case {1,2,3,4,5,6}      % дилатация ...шляпы
                 
-                disp('yep');
+                switch get(menu_handles.FiltParMenu3,'Value')
+                    
+                    case 1          % Ромб             
+                        structure = strel('diamond',beta);
+                    case 2          % Круг
+                        structure = strel('disk',beta);
+                    case 3          % Линия
+                        structure = strel('line',beta,gamma);
+                    case 4          % Восьмиугольник
+                        structure = strel('octagon',beta);
+                    case 5          % Пара точек
+                        structure = strel('pair',[beta gamma]);
+                    case 6          % Прямоугольник
+                        structure = strel('rectangle',[beta gamma]);
+                end
                 
+                object = getnhood(structure);
+                imtool(object);
                 return;
                 
             case 11     % успех/неудача
@@ -4531,7 +4709,7 @@ str = cell(size(Noises,1),1);
 %%%%%%%%%%%%%%%%%  ВЫПОЛНЕНИЕ ЗАШУМЛЕНИЯ И ФИЛЬТРАЦИИ %%%%%%%%%%%%%%%%%%%%%
 set(gcf,'Visible','off');
 Wait = waitbar(0,'Обработка изображения № 1',...
-    'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
+    'CreateCancelBtn','setappdata(gcbf,''canceling'',1)','');
 setappdata(Wait,'canceling',0);
 Wait.WindowStyle = 'modal';
 
@@ -4548,7 +4726,7 @@ for k = 1:size(Noises,1)
         catch ME
             delete(Wait);
             delete(menu_handles.menu);      % закрываем меню-окно  
-        disp(ME.identifier);          
+            disp(ME.identifier);          
             errordlg('Искажение изображения потерпело неудачу. Разбирайтесь, как хотите','KAAIP','modal');
         end
         
@@ -4810,12 +4988,10 @@ for CH = 1:size(Noised,3)                % для каждого канала цвета
             N = B/255 + (A/255).*randn(size(Noised,1),size(Noised,2));       % мат.ожидание+дисперсия(шумовая матрица)    
             N = round(N*255);
             Noised(:,:,CH) = Noised(:,:,CH) + N;
-
-        case 3                                  % ЭКСПОНЕНЦИАЛЬНОЕ РАСПРЕДЕЛЕНИЕ
+                               
+        case 3                             % ШУМ ПУАССОНА
             
-            N = exprnd(1/A,size(Noised,1),size(Noised,2));  
-            N = round(N*255);
-            Noised(:,:,CH) = Noised(:,:,CH) + N;                                      
+            Noised = imnoise(Image,'poisson');
 
         case 4                                  % ЛАПЛАСА РАСПРЕДЕЛЕНИЕ
             
@@ -4835,11 +5011,11 @@ for CH = 1:size(Noised,3)                % для каждого канала цвета
             N = round(N*255);            
             Noised(:,:,CH) = Noised(:,:,CH) + N;
 
-        case 5                                  % РЭЛЕЯ РАСПРЕДЕЛЕНИЕ
+        case 5                         % РАВНОМЕРНОЕ РАСПРЕДЕЛЕНИЕ
             
-            N = raylrnd(A,size(Noised,1),size(Noised,2)); 
-            N = round(N*255);
-            Noised(:,:,CH) = Noised(:,:,CH) + N; 
+            N = rand(size(Noised,1),size(Noised,2));        % рандомная шумовая матрица
+            N = round(N*(B-A)+A);        % в 256 оттенках
+            Noised(:,:,CH) = Noised(:,:,CH) + N;
             
         case 6                                  % СПЕКЛ-ШУМ
             
@@ -4870,16 +5046,17 @@ for CH = 1:size(Noised,3)                % для каждого канала цвета
             filtemask = fspecial('motion', A, B);
             Noised(:,:,CH) = imfilter(Noised(:,:,CH),filtemask,'circular');
             
-        case 11                         % РАВНОМЕРНОЕ РАСПРЕДЕЛЕНИЕ
+        case 11                                  % РЭЛЕЯ РАСПРЕДЕЛЕНИЕ
             
-            N = rand(size(Noised,1),size(Noised,2));        % рандомная шумовая матрица
-            N = round(N*(B-A)+A);        % в 256 оттенках
-            Noised(:,:,CH) = Noised(:,:,CH) + N;
+            N = raylrnd(A,size(Noised,1),size(Noised,2));
+            N = round(N*255);
+            Noised(:,:,CH) = Noised(:,:,CH) + N; 
             
-        case 12                             % ШУМ ПУАССОНА
+        case 12                                  % ЭКСПОНЕНЦИАЛЬНОЕ РАСПРЕДЕЛЕНИЕ
             
-            Noised = imnoise(Image,'poisson');
-            
+            N = exprnd(1/A,size(Noised,1),size(Noised,2));            
+            N = round(N*255);
+            Noised(:,:,CH) = Noised(:,:,CH) + N; 
     end    
 end
 
@@ -5152,7 +5329,7 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
                     case 5
                         structure = strel('pair',[beta gamma]);
                     case 6
-                        structure = strel('rectangle',[beta gamma])';
+                        structure = strel('rectangle',[beta gamma]);
                     case 7
                         structure = strel('arbitrary',Mask);
                 end
@@ -6163,6 +6340,42 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
         case 33         % КОНТРАСТИРОВАНИЕ С ГАММА-КОРРЕКЦИЕЙ
             
             Filtered(:,:,CH) = imadjust(Image(:,:,CH),[beta/255 gamma/255],[delta/255 epsilon/255],alpha);
+            
+        case 34         % ДЕТЕКТОР ОКРУЖНОСТЕЙ
+            
+            switch FPM2
+                case 1
+                    method = 'TwoStage';
+                case 2
+                    method = 'PhaseCode';
+            end
+            
+            switch FPM3
+                case 1
+                    OP = 'dark';
+                case 2
+                    OP = 'bright';
+            end
+            
+            switch size(Image,3)        % смотрим сколько каналов   
+                
+                case 3                  % триколор
+                    
+                    [centers, rads] = imfindcircles(Image,[delta eta],...
+                                        'ObjectPolarity',OP,'Method',method,...
+                                        'Sensitivity',beta,'EdgeThreshold',gamma/255);
+                                    
+                    return;
+                    
+                otherwise               % мультиканальные                    
+                    
+                    [centers, rads] = imfindcircles(Image(:,:,CH),[delta eta],...
+                                        'ObjectPolarity',OP,'Method',method,...
+                                        'Sensitivity',beta,'EdgeThreshold',gamma/255);
+                    
+                    
+            end 
+            
             
     end
     
@@ -7658,13 +7871,30 @@ feval([Slider '_Callback'],hObject,H,analyzer_handles);    % вызываем отклик
 % КОНТЕКСТНОЕ МЕНЮ "СОХРАНИТЬ СТРОКУ ОЦЕНОК КАК TXT"
 function SaveAssessmentTXT_Callback (hObject, ~, analyzer_handles)
 
+[FileName, PathName] = uiputfile(['*.' 'txt'],'Сохранить характеристики области интереса');
+
+if FileName ~= 0
+    
+    AssesmentName = get(analyzer_handles.AssesmentText,'String');
+    AssesmentVal = get(analyzer_handles.AssesmentValueText,'String');
+    Assess = strcat(AssesmentName,{' '},AssesmentVal);
+    
+    file_txt = fopen([PathName FileName],'wt');     % создаем текстовый файл
+    
+    for i = 1:size(Assess,1)                     % построчно вносим в него список
+        fprintf(file_txt,'%s\r\n',Assess{i});
+    end
+    fclose(file_txt);                       % закрываем файл   
+    
+end
+
 
 % КОНТЕКСТНОЕ МЕНЮ "СОХРАНИТЬ СТРОКУ ОЦЕНОК КАК XLSX"
 function SaveAssessmentXLSX_Callback (~, ~, analyzer_handles)
 
 [FileName, PathName] = uiputfile('*.xlsx','Сохранить значения оценки');
 
-if FileName~=0
+if FileName ~= 0
     
     DotPositions = strfind(FileName,'.');            % считываем точки в названии
     format = FileName(DotPositions(end)+1:end);
