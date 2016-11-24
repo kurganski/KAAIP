@@ -57,13 +57,8 @@ end
 
 % TODO LIST:
 
-%   1) ускорить билатеральные фильтры
-%   2) пороговые фильтры: прикрутит hsv и доп. слайдеры 
-%   3) шумы экспоненциальный и –эле€ проверить!
-%   4) проверить как поведут себ€ все фильтры если на входе bw из 256
-%       оттенков
-%   6) проверить что происходит если убирать расширение при сохранении
-%       файлов
+%   2) пороговые фильтры: прикрутить hsv и доп. слайдеры
+%   3) добавить позицию - сломалась
  
 %   8) ¬ мануале сделать инфографикой описание
 
@@ -615,10 +610,15 @@ if size(Noised,4) > 1       % если в списке более 1й обработки, тогда можно что-
     set(handles.DeleteListPosition,'Enable','on');
 end
 
+if isnan(Assessment_F(end).SSIM(1))
+    SSIM = 0;
+else
+    SSIM = 2;
+end
 
-Assessment = GetAssessment(Original,Temp,1);
+Assessment = GetAssessment(Original,Temp,SSIM);
 Assessment_F(end+1) = Assessment;
-Assessment = GetAssessment(Original,Original,1);
+Assessment = GetAssessment(Original,Original,SSIM);
 Assessment_N(end+1) = Assessment;
 
 % вызовем подфункцию, котора€ нарисует графики и обновить картинки
@@ -1165,7 +1165,7 @@ toolboxes = ver();          % считываем наличие тулбоксов
 good = false;
 for i = 1:size(toolboxes,2) % проходимс€ по каждому
 
-    if strcmp('Statistics Toolbox',toolboxes(i).Name) == 1
+    if strcmp('Statistics and Machine Learning Toolbox',toolboxes(i).Name) == 1
         good = true;
         break;      % если такой тулбокс есть, то все ок
     end
@@ -1185,7 +1185,7 @@ if ~good
         '—мазывание'
         };
     set(menu_handles.NoiseType,'String',str);
-    errordlg({  '¬аша верси€ Matab не содержит расширение "Statistics Toolbox".';...
+    errordlg({  '¬аша верси€ Matab не содержит расширение "Statistics and Machine Learning Toolbox".';...
                 '¬ списке искажений экспоненциальный шум и шум –эле€ недоступны'},'KAAIP','modal');
 else
     str = {...
@@ -2051,18 +2051,18 @@ switch FilterType
         set(menu_handles.GammaSlider,'Min',1,'Max',255,'Value',100,'SliderStep',[1/254 10/254]);
         set(menu_handles.GammaValText,'String','100');
         
-        MS = min(size(Original,2),size(Original,1));
+        MS = floor(min(size(Original,2),size(Original,1))/2);
         if MS <= 10
            MS = 11; 
         end
         
         set(menu_handles.DeltaText,'String','÷елевой радиус: ');        
         set(menu_handles.DeltaSlider,'Min',10,'Max',MS,'Value',10,...
-                                    'SliderStep',[1/(MS-2) 10/(MS-2)]);
+                                    'SliderStep',[1/(MS-10) 10/(MS-10)]);
         set(menu_handles.DeltaValText,'String',['10' char(8804) 'R' char(8804) '11']);
         
         set(menu_handles.EtaSlider,'Min',10,'Max',MS,'Value',11,...
-                                    'SliderStep',[1/(MS-2) 10/(MS-2)]); 
+                                    'SliderStep',[1/(MS-10) 10/(MS-10)]); 
 end
 
 
@@ -4626,10 +4626,10 @@ switch get(menu_handles.FilterType,'Value')
         
     case 6                     % билатеральные фильтры
         
-        xmax = 2*get(menu_handles.FiltParMenu1,'Value') + 1;        
-        x = 0:0.1:2*xmax-2;
+        xmax = 2*get(menu_handles.FiltParMenu1,'Value');        
+        x = 0:0.1:xmax;
         graph = exp(-beta*(x));        
-        Xlimits = 0:1:2*xmax-2;
+        Xlimits = 0:1:xmax;
         GraphTitle = {'«ависимость коэффициента довери€ от суммы модулей разности индексов пикселей';...
             'K(i,j) = exp(-\beta(|i-i_{0}|+|j-j_{0}|)),';...
             ['где \beta = ' num2str(beta)]};
@@ -5641,68 +5641,51 @@ for CH = 1:size(Image,3)        % дл€ каждого канала цвета
             
             switch FPM2
                 
-                case 1         % Ѕ»Ћј“≈–јЋ№Ќџ… ‘»Ћ№“–
+                case 1         % Ѕ»Ћј“≈–јЋ№Ќџ… ‘»Ћ№“–                    
+
+                    ImCol = image2col(Image(:,:,CH),MaskSize,IndentType);   % столбцы-вектора масок
+                    Col = zeros(size(Image,1)*size(Image,2),1);             % вектор-столбец выходных пикселей
                     
-                    for j = 1:size(Image,1)                                 % дл€ каждого столбца
-                        for i = 1:size(Image,2)                             % дл€ каждой строки
-                            w = zeros(MaskSize);                            % пуста€ матрица коэффициентов 3х3
-                            S = N(j:j+MaskSize-1,i:i+MaskSize-1);           % считываем матрицу 3х3
-                            
-                            for l = 1:MaskSize                              % дл€ каждого столбца €дра фильтра
-                                for k = 1:MaskSize                          % дл€ каждой строки €дра фильтра вычисл€ем коэффициент
-                                    
-                                    w(l,k) = exp(-alpha*abs(S(central,central)-S(l,k)) - beta*(abs(central-k)+abs(central-l))); 
-                                end
-                            end
-                            
-                            S = S.*w;       % перемножаем коэффициенты поэлементно со значени€ми €ркостей
-                            Filtered(j,i,CH) = sum(S(:))/sum(w(:));    % возвращаем отфильтрованное значение
-                            
-                        end
-                    end
+                    Beta = SpacialWeightCount(MaskSize);                    % значени€ пространственных весов в маске
+                    [~,BetaWeight] = meshgrid(1:size(ImCol,2),Beta);       % задаем их матрицей, а не строкой
+                    [ImColCenters,~] = meshgrid(ImCol((MaskSize^2+1)/2,:),1:size(ImCol,1));
                     
-                case 2                  % Ѕ»Ћј“≈–јЋ№Ќџ… ‘»Ћ№“– (ћ≈ƒ»јЌј)
+                    AlphaWeight = alpha*255*abs(ImColCenters - ImCol);         % значени€ €ркостных весов
+                    Weights = exp(-AlphaWeight - beta*BetaWeight);             % значени€ пространственных весов
+                    Col = sum(Weights.*ImCol,1)./sum(Weights,1);            % итоговые значени€
                     
-                    for j = 1:size(Image,1)                                 % дл€ каждого столбца
-                        for i = 1:size(Image,2)                             % дл€ каждой строки
-                            w = zeros(MaskSize);                            % пуста€ матрица коэффициентов 3х3
-                            S = N(j:j+MaskSize-1,i:i+MaskSize-1);           % считываем матрицу 3х3                            
-                            
-                            S(central,central) = median(S(:));              % берем медиану в качестве центрального элемента
-                            
-                            for l = 1:MaskSize                              % дл€ каждого столбца €дра фильтра
-                                for k = 1:MaskSize                          % дл€ каждой строки €дра фильтра вычисл€ем коэффициент
-                                    
-                                    w(l,k) = exp(-alpha*abs(S(central,central)-S(l,k)) - beta*(abs(central-k)+abs(central-l))); 
-                                end
-                            end                            
-                            
-                            S = S.*w;       % перемножаем коэффициенты поэлементно со значени€ми €ркостей
-                            Filtered(j,i,CH) = sum(S(:))/sum(w(:));    % возвращаем отфильтрованное значение                            
-                        end
-                    end
+                    Filtered(:,:,CH) = Col2Filtered(Col,Image(:,:,CH));
+            
+                case 2                  % Ѕ»Ћј“≈–јЋ№Ќџ… ‘»Ћ№“– (ћ≈ƒ»јЌј)                    
+
+                    ImCol = image2col(Image(:,:,CH),MaskSize,IndentType);   % столбцы-вектора масок
+                    Col = zeros(size(Image,1)*size(Image,2),1);             % вектор-столбец выходных пикселей
+                    
+                    Beta = SpacialWeightCount(MaskSize);                    % значени€ пространственных весов в маске
+                    [~,BetaWeight] = meshgrid(1:size(ImCol,2),Beta);
+                    med = sort(ImCol,1);
+                    ImCol((MaskSize^2 + 1)/2,:) = med((MaskSize^2 + 1)/2,:);          % центральные пиксели маски равны медиане
+                    [ImColCenters,~] = meshgrid(ImCol((MaskSize^2 + 1)/2,:),1:size(ImCol,1));
+                    
+                    AlphaWeight = (alpha*255)*abs(ImColCenters - ImCol);          % значени€ €ркостных весов
+                    Weights = exp(-AlphaWeight - beta*BetaWeight);          % значени€ конечных весов
+                    Col = sum(Weights.*ImCol,1)./sum(Weights,1);    
+                    Filtered(:,:,CH) = Col2Filtered(Col,Image(:,:,CH));
             
                 case 3                    % Ѕ»Ћј“≈–јЋ№Ќџ… ‘»Ћ№“– (—–≈ƒЌ≈≈ ј–»‘ћ≈“»„≈— ќ≈)
+                                         
+                    ImCol = image2col(Image(:,:,CH),MaskSize,IndentType);   % столбцы-вектора масок
+                    Col = zeros(size(Image,1)*size(Image,2),1);             % вектор-столбец выходных пикселей
                     
-                    for j = 1:size(Image,1)                                 % дл€ каждого столбца                        
-                        
-                        for i = 1:size(Image,2)                             % дл€ каждой строки
-                            w = zeros(MaskSize);                            % пуста€ матрица коэффициентов 3х3
-                            S = N(j:j+MaskSize-1,i:i+MaskSize-1);           % считываем матрицу 3х3
-                            
-                            S(central,central) = mean(S(:));                % берем ср. арифметичекое
-                            
-                            for l = 1:MaskSize                              % дл€ каждого столбца €дра фильтра
-                                for k = 1:MaskSize                          % дл€ каждой строки €дра фильтра вычисл€ем коэффициент
-                                    w(l,k) = exp(-alpha*abs(S(central,central)-S(l,k)) - beta*(abs(central-k)+abs(central-l))); 
-                                end
-                            end
-                            
-                            S = S.*w;       % перемножаем коэффициенты поэлементно со значени€ми €ркостей
-                            Filtered(j,i,CH) = sum(S(:))/sum(w(:));    % возвращаем отфильтрованное значение 
-                            
-                        end
-                    end
+                    Beta = SpacialWeightCount(MaskSize);                    % значени€ пространственных весов в маске
+                    [~,BetaWeight] = meshgrid(1:size(ImCol,2),Beta);
+                    ImCol((MaskSize^2 + 1)/2,:) = sum(ImCol,1)./MaskElements;          % центральные пиксели маски равны медиане
+                    [ImColCenters,~] = meshgrid(ImCol((MaskSize^2 + 1)/2,:),1:size(ImCol,1));
+                    
+                    AlphaWeight = (alpha*255)*abs(ImColCenters - ImCol);          % значени€ €ркостных весов
+                    Weights = exp(-AlphaWeight - beta*BetaWeight);          % значени€ конечных весов
+                    Col = sum(Weights.*ImCol,1)./sum(Weights,1);    
+                    Filtered(:,:,CH) = Col2Filtered(Col,Image(:,:,CH));
                     
                 case 4                        % Ѕ»Ћј“≈–јЋ№Ќџ… ‘»Ћ№“– (ћ»Ќ»ћјЋ№Ќќ… –ј«Ќќ—“»)
                     
@@ -5723,7 +5706,7 @@ for CH = 1:size(Image,3)        % дл€ каждого канала цвета
                             
                             for l = 1:MaskSize                              % дл€ каждого столбца €дра фильтра
                                 for k = 1:MaskSize                          % дл€ каждой строки €дра фильтра вычисл€ем коэффициент
-                                    w(l,k) = exp(-alpha*abs(S(central,central)-S(l,k)) - beta*(abs(central-k)+abs(central-l)));
+                                    w(l,k) = exp(-alpha*255*abs(S(central,central)-S(l,k)) - beta*(abs(central-k)+abs(central-l)));
                                 end
                             end
                             
@@ -5760,7 +5743,7 @@ for CH = 1:size(Image,3)        % дл€ каждого канала цвета
                             
                             for l = 1:MaskSize                              % дл€ каждого столбца €дра фильтра
                                 for k = 1:MaskSize                          % дл€ каждой строки €дра фильтра вычисл€ем коэффициент
-                                    w(l,k) = exp(-alpha*abs(S(central,central)-S(l,k)) -  beta*(abs(central-k)+abs(central-l)));
+                                    w(l,k) = exp(-alpha*255*abs(S(central,central)-S(l,k)) -  beta*(abs(central-k)+abs(central-l)));
                                 end
                             end
                             
@@ -5807,7 +5790,7 @@ for CH = 1:size(Image,3)        % дл€ каждого канала цвета
                         %%%%%%%%%%%%%%%%%%% выбор коэффициентов маски фильтра %%%%%%%%%
                         
                         for l = 1:MaskElements                  % дл€ каждого столбца €дра фильтра
-                            w(l) = exp(-alpha*(Ro(I,l)));       % вычисл€ем коэффициент
+                            w(l) = exp(-alpha*255*(Ro(I,l)));       % вычисл€ем коэффициент
                         end
                         
                         w_beta = zeros(size(w));
