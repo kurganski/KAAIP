@@ -59,13 +59,11 @@ end
 
 %   1) ускорить билатеральные фильтры
 %   2) пороговые фильтры: прикрутит hsv и доп. слайдеры 
-%   5) надо как то давать возможность убирать ssim. Он очень долгий
 %   3) шумы экспоненциальный и Рэлея проверить!
 %   4) проверить как поведут себя все фильтры если на входе bw из 256
 %       оттенков
 %   6) проверить что происходит если убирать расширение при сохранении
 %       файлов
-%   7) мин радиус для поиска = 10. Что будет если взять изображение 9х9
  
 %   8) В мануале сделать инфографикой описание
 
@@ -155,6 +153,7 @@ end
 if ~isempty(colors)      
     Temp = 255*ind2rgb(Temp,colors);
 end
+
 
 Original = [];
 Original = Temp;
@@ -752,7 +751,7 @@ switch char(WhatToShow)       % смотрим, что нужно показать
                 if getfield(Assessment_N,{NMV},Assess,{ch+1}) == inf
                     val = char(8734);
                 elseif isnan(getfield(Assessment_N,{NMV},Assess,{ch+1})) == 1
-                    val = '0/0';
+                    val = char(8709);
                 else
                     val = num2str(getfield(Assessment_N,{NMV},Assess,{ch+1}));
                 end
@@ -769,7 +768,7 @@ switch char(WhatToShow)       % смотрим, что нужно показать
                 if getfield(Assessment_F,{FMV},Assess,{ch+1}) == inf
                     val = char(8734);
                 elseif isnan(getfield(Assessment_F,{FMV},Assess,{ch+1})) == 1
-                    val = '0/0';
+                    val = char(8709);
                 else
                     val = num2str(getfield(Assessment_F,{FMV},Assess,{ch+1}));
                 end
@@ -4709,7 +4708,7 @@ str = cell(size(Noises,1),1);
 %%%%%%%%%%%%%%%%%  ВЫПОЛНЕНИЕ ЗАШУМЛЕНИЯ И ФИЛЬТРАЦИИ %%%%%%%%%%%%%%%%%%%%%
 set(gcf,'Visible','off');
 Wait = waitbar(0,'Обработка изображения № 1',...
-    'CreateCancelBtn','setappdata(gcbf,''canceling'',1)','');
+    'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
 setappdata(Wait,'canceling',0);
 Wait.WindowStyle = 'modal';
 
@@ -4725,9 +4724,9 @@ for k = 1:size(Noises,1)
             Im = Temp_Filtered(:,:,:,k-1);
         catch ME
             delete(Wait);
-            delete(menu_handles.menu);      % закрываем меню-окно  
-            disp(ME.identifier);          
-            errordlg('Искажение изображения потерпело неудачу. Разбирайтесь, как хотите','KAAIP','modal');
+            delete(menu_handles.menu);      % закрываем меню-окно          
+            errordlg(['Искажение изображения потерпело неудачу в строке № ' num2str(ME.stack(1).line)],'KAAIP','modal');
+            return;
         end
         
     else
@@ -4754,11 +4753,12 @@ for k = 1:size(Noises,1)
     catch ME
         delete(Wait);
         delete(menu_handles.menu);      % закрываем меню-окно
-        disp(ME.identifier);
-        errordlg('Обработка изображения потерпела неудачу. Разбирайтесь, как хотите','KAAIP','modal');
+        errordlg(['Обработка изображения потерпела неудачу в строке № ' num2str(ME.stack(1).line)],'KAAIP','modal');
+        return;
     end
     
     drawnow;         % обновляем значение кнопки отмены, чтобы она работала сразу
+    
     if getappdata(Wait,'canceling') == 1          % если нажали кнопку отмены - выходим из цикла
         delete(Wait);
         delete(menu_handles.menu);      % закрываем меню-окно
@@ -4794,15 +4794,23 @@ end
 
 waitbar(k/(size(Noises,1)+1),Wait,'Расчет критериев оценки');
 
+% нужен ли расчет SSIM-характеристик
+if menu_handles.SSIM_check.Value == 1
+    SSIM = 2;
+else
+    SSIM = 0;
+end
+
 % проведем оценку полученных изображений и округлим ее до сотых
 Assessment_N = [];
 Assessment_F = [];
-Assessment_N = GetAssessment(Original,Noised,1);
-Assessment_F = GetAssessment(Original,Filtered,1);
+Assessment_N = GetAssessment(Original,Noised,SSIM);
+Assessment_F = GetAssessment(Original,Filtered,SSIM);
 
 % УСТАНОВКИ ОСНОВНОГО ОКНА
 set(handles.NoisedMenu,'String',str,'Value',1,'Enable','on');
 set(handles.FilteredMenu,'String',str,'Value',1,'Enable','on');
+handles.AssessMenu.Value = 1;
 set(handles.Noised,'Enable','on');
 
 ShowMenuString = handles.ShowMenu.String;
@@ -6249,7 +6257,7 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
                         
             Filtered(:,:,CH) = Col2Filtered(Col,Image(:,:,CH));
             
-        case 28             % СЕГМЕНТАЦИЯ 
+        case 28             % ФИЛЬТРЫ ЛОКАЛЬНЫХ СТАТИСТИК
             
         case 29             % ПОРОГОВЫЙ ФИЛЬТР                        
             
@@ -6360,27 +6368,58 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
             switch size(Image,3)        % смотрим сколько каналов   
                 
                 case 3                  % триколор
+%                     
+                    warning('off');                    
+                    if FPM2 == 1
+                        [centers, rads] = imfindcircles(Image,[delta eta],...
+                                            'ObjectPolarity',OP,'Method',method,...
+                                            'Sensitivity',beta,'EdgeThreshold',gamma/255);  
+                    else
+                        [centers, rads] = imfindcircles(Image,[delta eta],...
+                                            'ObjectPolarity',OP,'Method',method,...
+                                            'EdgeThreshold',gamma/255);                          
+                    end
+                    warning('on');    
                     
-                    [centers, rads] = imfindcircles(Image,[delta eta],...
-                                        'ObjectPolarity',OP,'Method',method,...
-                                        'Sensitivity',beta,'EdgeThreshold',gamma/255);
-                                    
+                    for x = 1:length(rads)
+                        points = GetCirclePoints(centers(x,1),centers(x,2),rads(x),Filtered(:,:,CH));                        
+                        for y = 1:size(points,1)
+                            Filtered(points(y,2),points(y,1),1) = 1;
+                        end
+                    end
+                    
+                    for x = 2:size(Image,3)
+                        Filtered(:,:,x) = Filtered(:,:,1);
+                    end
+                    
+                    Filtered = uint8(Filtered*255);
                     return;
                     
                 otherwise               % мультиканальные                    
                     
-                    [centers, rads] = imfindcircles(Image(:,:,CH),[delta eta],...
-                                        'ObjectPolarity',OP,'Method',method,...
-                                        'Sensitivity',beta,'EdgeThreshold',gamma/255);
+                    warning('off');                 
+                    if FPM2 == 1
+                        [centers, rads] = imfindcircles(Image(:,:,CH),[delta eta],...
+                                            'ObjectPolarity',OP,'Method',method,...
+                                            'Sensitivity',beta,'EdgeThreshold',gamma/255);  
+                    else
+                        [centers, rads] = imfindcircles(Image(:,:,CH),[delta eta],...
+                                            'ObjectPolarity',OP,'Method',method,...
+                                            'EdgeThreshold',gamma/255);                          
+                    end                                       
+                    warning('on');      
                     
-                    
-            end 
-            
-            
-    end
-    
+                    for x = 1:length(rads)
+                        points = GetCirclePoints(centers(x,1),centers(x,2),rads(x),Filtered(:,:,CH));
+                        
+                        for y = 1:size(points,1)
+                            Filtered(points(y,2),points(y,1),CH) = 1;
+                        end
+                        
+                    end              
+            end
+    end    
 end
-
 
 Filtered = uint8(Filtered*255);
     
@@ -6431,11 +6470,14 @@ end
 
 
 % ФУНКЦИЯ ОЦЕНКИ ОРИГИНАЛА И ОБРАБОТАННОГО ИЗОБРАЖЕНИЯ
-function Assessment = GetAssessment(Orig_Im,Im,BuildImages)
+function Assessment = GetAssessment(Orig_Im,Im,SSIM)
 
 % Orig_Im - исходное изображение
 % Im - НАБОР преобразованных изображений
 % Assessment - структура с параметрами оценки
+% если SSIM == 0 - его не нужно считать совсем
+% если SSIM == 1 - нужно для 2D изображения в анализаторе
+% если SSIM == 2 - считаем всё
 
 assert( size(Im,1) == size(Orig_Im,1) &&...
         size(Im,2) == size(Orig_Im,2) &&...
@@ -6510,11 +6552,15 @@ for X = 1:size(Im,4)        % для всех отфильтрованных/зашумленных изображений
         Assessment(X).NMSE(1+RGB) = NMSE(RGB);
         Assessment(X).SNR(1+RGB) = SNR(RGB);
         Assessment(X).PSNR(1+RGB) = PSNR(RGB);
-        Assessment(X).SSIM(1+RGB) = ssim(Orig_Im(:,:,RGB),Im(:,:,RGB,X));
+        if SSIM ~= 0
+            Assessment(X).SSIM(1+RGB) = ssim(Orig_Im(:,:,RGB),Im(:,:,RGB,X));
+        else
+            Assessment(X).SSIM(1+RGB) = NaN;
+        end
         
     end
     
-    if BuildImages == false         % если вызвал анализатор, то выходим
+    if SSIM == 1         % если вызвал анализатор, то выходим
         return;
     end
     
@@ -6523,10 +6569,16 @@ for X = 1:size(Im,4)        % для всех отфильтрованных/зашумленных изображений
     Assessment(X).MSE(1) = sum(MSE)/size(Im,3);
     Assessment(X).NMSE(1) = sum(NMSE)/size(Im,3);
     Assessment(X).SNR(1) = sum(SNR)/size(Im,3);
-    Assessment(X).PSNR(1) = sum(PSNR)/size(Im,3);    
-    [Assessment(X).SSIM(1), Assessment(X).SSIM_Image] = ssim(Orig_Im,Im(:,:,:,X));
+    Assessment(X).PSNR(1) = sum(PSNR)/size(Im,3);  
     
-    Assessment(X).SSIM_Image = uint8(127.5*Assessment(X).SSIM_Image + 127.5);
+    if SSIM == 2
+        [Assessment(X).SSIM(1), Assessment(X).SSIM_Image] = ssim(Orig_Im,Im(:,:,:,X));
+        Assessment(X).SSIM_Image = uint8(127.5*Assessment(X).SSIM_Image + 127.5);
+    elseif SSIM == 0
+        Assessment(X).SSIM(1) = NaN;
+        Assessment(X).SSIM_Image = zeros(size(Im,1),size(Im,2),size(Im,3));
+    end
+    
 end
 
 
@@ -7064,6 +7116,31 @@ xlswrite(FileName,Ticks,1);
 xlswrite(FileName,Data,1,'B1');
 
 
+% ФУНКЦИЯ, ВЫДАЮЩАЯ КООРДИНАТЫ ТОЧЕК ОКРУЖНОСТИ
+function points = GetCirclePoints(center_x,center_y,R,Image)
+
+phi = 1:180/(2*R*pi):360;           % считаем окружность
+points_x = center_x + R*cosd(phi);
+points_y = center_y + R*sind(phi);
+
+points_x = round(points_x);     % округляем
+points_y = round(points_y);
+
+% проверки на выход за пределы изображения. Не менять порядок x и y!!!! 
+points_y( points_x > size(Image,2) | points_x < 1 ) = [];      
+points_x( points_x > size(Image,2) | points_x < 1 ) = [];
+
+points_x( points_y > size(Image,1) | points_y < 1 ) = [];
+points_y( points_y > size(Image,1) | points_y < 1 ) = [];
+
+% загоняем в один массив
+points(:,1) = points_x;
+points(:,2) = points_y;
+
+% убираем повторяющиеся пары
+points = unique(points,'rows');
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%% ФУНКЦИИ "IMAGE ANALYZER" %%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -7484,7 +7561,7 @@ else        % если выбрано зашумленное или отфильтрованное изображение
     Im = double(Image(Y0:Y1,X0:X1));     % перевели в дубль фрагмент и исходное изображение
     Orig_Im = double(Original(:,:,get(analyzer_handles.ChannelImageMenu,'Value')));
     
-    Assessment = GetAssessment(Orig_Im(Y0:Y1,X0:X1),Im,0);
+    Assessment = GetAssessment(Orig_Im(Y0:Y1,X0:X1),Im,1);
     
     asses_str = ...
         [ {'Математическое ожидание: '};...
