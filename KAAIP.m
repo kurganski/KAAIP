@@ -57,8 +57,9 @@ end
 
 % TODO LIST:
 
-%   2) пороговые фильтры: прикрутить hsv и доп. слайдеры
-%   3) добавить позицию - сломалась
+%   1) пороговые фильтры: прикрутить hsv и доп. слайдеры   
+%   2) думай над хэш...
+%   3) проверить пороговый фильтр под гистограммой
  
 %   8) В мануале сделать инфографикой описание
 
@@ -622,6 +623,7 @@ Assessment = GetAssessment(Original,Original,SSIM);
 Assessment_N(end+1) = Assessment;
 
 % вызовем подфункцию, которая нарисует графики и обновить картинки
+ShowMenu_Callback(hObject, eventdata, handles);
 AssessMenu_Callback(hObject, eventdata, handles);
 
 
@@ -1216,6 +1218,7 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% СПИСКИ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
 % СПИСОК ШУМОВ
 function NoiseType_Callback(~, ~, menu_handles)
 
@@ -1325,26 +1328,26 @@ global Original;        % зашумленный вариант
 
 FilterType = get(menu_handles.FilterType,'Value');   %считываем значение выбранного фильтра
 
-FilterWithMaskTable = [2 5 11];                         % номера фильтров, которым нужно 1я таблица
+FilterWithMaskTable = [2 5 11 28];                         % номера фильтров, которым нужно 1я таблица
 FilterWithMaskTable1 = 5;                         % номера фильтров, которым нужно 2я таблица
-FilterWithMenu1 = [2 6 8 9 11 13:14 19 22 24:27];
-FilterWithMenu2 = [2:6 7 9 10 11 14 25:26 34];                       % номера фильтров, которым нужно 2е меню
-FilterWithMenu3 = [4 9 15 17 18 25 29:32 34];        % номера фильтров, которым нужно 3е меню
+FilterWithMenu1 = [2 6 8 9 11 13:14 19 22 24:28];
+FilterWithMenu2 = [2:6 7 9 10 11 14 25:26 28 29 34];                       % номера фильтров, которым нужно 2е меню
+FilterWithMenu3 = [4 9 15 17 18 25 29 31:32 34];        % номера фильтров, которым нужно 3е меню
 
                                                 % номера фильтров, которым нужны слайдеры  
-FilterWith_FirstSlider = [3 5:9 10:12 13 15:18 20:23 24:27 29:33];        
-FilterWith_SecondSlider = [4 5:9 10:12 16 30 32:34];      
+FilterWith_FirstSlider = [3 5:9 10:12 13 15:18 20:23 24:27 29 31:33];        
+FilterWith_SecondSlider = [4 5:9 10:12 16 29 32:34];      
 FilterWith_ThirdSlider = [5 7:11 16 33 34];
-FilterWith_FourthSlider = [4 5 7:10 33 34];
+FilterWith_FourthSlider = [4 5 7:10 29 33 34];
 FilterWith_FifthSlider = [8 9 33];
 FilterWith_SixthSlider = 9;
-FilterWith_SeventhSlider = [9 34];
+FilterWith_SeventhSlider = [9 29 34];
 FilterWith_EigthSlider = 9;
 
 FilterWith_Exp_alpha_Button = [5 6 8 11 33];    % фильтры с кнопками
 FilterWith_Exp_beta_Button = [4 6 32];        
         
-FilterWithIndends = [2 6 8 11 13:14 19:23 24:27];  % фильтры с выбором типа расширения границ
+FilterWithIndends = [2 6 8 11 13:14 19:27];  % фильтры с выбором типа расширения границ
 
 % прячем и активируем все, а потом октрываем то, что нужно
 ItemsToHide = get(menu_handles.uipanel3,'Children');
@@ -1778,7 +1781,6 @@ switch FilterType
         set(menu_handles.GammaValText,'String','1');
         
         
-        
     case 12                 % ФИЛЬТР ВИННЕРА
         set(menu_handles.AlphaSlider,'Min',1,'Max',size(Original,2),'Value',5,'SliderStep',[1/(size(Original,2)-1) 10/(size(Original,2)-1)]);
         set(menu_handles.AlphaText,'String','Длина области: ');
@@ -1901,9 +1903,8 @@ switch FilterType
         
         set(menu_handles.FiltParText3,'String','Модель помехи');
         set(menu_handles.FiltParMenu3,'String',{'аддитивная','мультипликативная','аддитивная + мультипликативная'});
-        
-        
-        
+              
+       
         set(menu_handles.AlphaText,'String',[char(963) char(178) ' адд. помехи: ']);
         set(menu_handles.AlphaSlider,'Min',1,'Max',255,'Value',50,'SliderStep',[1/254 10/254]);
         set(menu_handles.AlphaValText,'String','50'); 
@@ -1944,8 +1945,7 @@ switch FilterType
         set(menu_handles.BetaText,'String','Число выборок: ');
         set(menu_handles.BetaSlider,'Min',1,'Max',25,'Value',1,'SliderStep',[1/24 10/24]);
         set(menu_handles.BetaValText,'String','1');   
-        
-        
+                
     case 27                 % КУАНА 
         
         set(menu_handles.FiltParText1,'String','Размер маски');  
@@ -1955,30 +1955,58 @@ switch FilterType
         set(menu_handles.AlphaSlider,'Min',1,'Max',25,'Value',1,'SliderStep',[1/24 10/24]);
         set(menu_handles.AlphaValText,'String','1'); 
          
-    case 28                 % ФИЛЬТРЫ ЛДОКАЛЬНЫХ СТАТИСТИК
+    case 28                 % ФИЛЬТР ЛОКАЛЬНЫХ СТАТИСТИК        
+        
+        set(menu_handles.FiltParText1,'String','Размер маски');      
+        set(menu_handles.FiltParMenu1,'String',{'3x3','5x5','7x7','9x9'});
+        
+        set(menu_handles.FiltParText2,'String','Тип:');
+        set(menu_handles.FiltParMenu2,'String',{'Предельный',...
+                                                'Энтропийный',...
+                                                'СКО'});       
+        
+        set(menu_handles.MaskTable, 'Data',ones(3),'FontSize',34,...
+            'Position',[400 5 182 182],...
+            'ColumnWidth',{60 60 60});
+        
+    case 29                 % ПОРОГОВАЯ ОБРАБОТКА
+        
+        set(menu_handles.FiltParText3,'String','Обработка');   
+        set(menu_handles.FiltParMenu3,'String',{'Пропускание','Подавление'});
+        
+        if size(Original,3) == 3
+            str = {'RGB';'HSV'};
+        else
+            str = {'RGB'};
+        end
+        
+        set(menu_handles.FiltParText2,'String','Цветовая схема');    
+        set(menu_handles.FiltParMenu2,'String',str);
         
         
-    case 29                 % ПОРОГОВЫЙ
-        
-        set(menu_handles.FiltParText3,'String','Тип обработки');
-        set(menu_handles.FiltParMenu3,'Value',1,'String',{'Простая';'ФНЗ';'ФВЗ'});
-        
-        set(menu_handles.AlphaSlider,'Min',1,'Max',255,'Value',1,'SliderStep',[1/254 10/254]);
-        set(menu_handles.AlphaText,'String','Порог:  ');
-        set(menu_handles.AlphaValText,'String','1');        
-        
-    case 30                 % ПОРОГОВОЙ ПОЛОСОВОЙ
-        
-        set(menu_handles.FiltParText3,'String','Тип обработки');
-        set(menu_handles.FiltParMenu3,'Value',1,'String',{'ППФ';'ПЗФ'});
-        
-        set(menu_handles.AlphaSlider,'Min',0,'Max',254,'Value',0,'SliderStep',[1/254 10/254]);
-        set(menu_handles.BetaSlider,'Min',1,'Max',255,'Value',255,'SliderStep',[1/254 10/254]);
-        set(menu_handles.AlphaText,'String','НП: ');
-        
-        set(menu_handles.BetaText,'String','ВП: ');
+        set(menu_handles.AlphaText,'String','Значение обработки: ');
+        set(menu_handles.AlphaSlider,'Min',0,'Max',255,'Value',1,'SliderStep',[1/255 10/255]);
         set(menu_handles.AlphaValText,'String','0'); 
-        set(menu_handles.BetaValText,'String','255'); 
+        
+        set(menu_handles.BetaText,'String','Номер канала:');
+        set(menu_handles.BetaValText,'String','1'); 
+        
+        if size(Original,3) == 1
+            set(menu_handles.BetaSlider,'Enable','off');
+        else
+            set(menu_handles.BetaSlider,'Min',1,'Max',size(Original,3),...
+                'Value',1,'SliderStep',[1/(size(Original,3)-1) 1/(size(Original,3)-1)]);
+        end
+        
+        set(menu_handles.DeltaText,'String','Полоса: ');        
+        set(menu_handles.DeltaSlider,'Min',0,'Max',254,'Value',0,...
+                                    'SliderStep',[1/254 10/254]);
+        set(menu_handles.DeltaValText,'String',['0 ' char(8804) ' I ' char(8804) ' 255']);
+        
+        set(menu_handles.EtaSlider,'Min',1,'Max',255,'Value',255,'SliderStep',[1/254 10/254]);                        
+        
+    case 30                 % 
+         
         
     case 31                 % ЭКВАЛИЗАЦИЯ ГИСТОГРАММЫ
         
@@ -2013,24 +2041,24 @@ switch FilterType
         
     case 33             % КОНТРАСТИРОВАНИЕ C ГАММА-КОРРЕКЦИЕЙ
         
-        set(menu_handles.AlphaSlider,'Min',0.01,'Max',20,'Value',1,'SliderStep',[0.01/19.99 0.1/19.99]);
         set(menu_handles.AlphaText,'String','Гамма: ');
+        set(menu_handles.AlphaSlider,'Min',0.01,'Max',20,'Value',1,'SliderStep',[0.01/19.99 0.1/19.99]);
         set(menu_handles.AlphaValText,'String','1');
         
-        set(menu_handles.BetaSlider,'Min',0,'Max',254,'Value',0,'SliderStep',[1/254 10/254]);
         set(menu_handles.BetaText,'String','Верхний порог: ');
+        set(menu_handles.BetaSlider,'Min',0,'Max',254,'Value',0,'SliderStep',[1/254 10/254]);
         set(menu_handles.BetaValText,'String','0'); 
         
-        set(menu_handles.GammaSlider,'Min',1,'Max',255,'Value',255,'SliderStep',[1/254 10/254]);
         set(menu_handles.GammaText,'String','Нижний порог: ');
+        set(menu_handles.GammaSlider,'Min',1,'Max',255,'Value',255,'SliderStep',[1/254 10/254]);
         set(menu_handles.GammaValText,'String','255');
         
-        set(menu_handles.DeltaSlider,'Min',0,'Max',254,'Value',0,'SliderStep',[1/254 10/254]);
         set(menu_handles.DeltaText,'String','Нижний порог: ');
+        set(menu_handles.DeltaSlider,'Min',0,'Max',254,'Value',0,'SliderStep',[1/254 10/254]);
         set(menu_handles.DeltaValText,'String','0');
         
-        set(menu_handles.EpsilonSlider,'Min',1,'Max',255,'Value',255,'SliderStep',[1/254 10/254]);
         set(menu_handles.EpsilonText,'String','Верхний порог: ');
+        set(menu_handles.EpsilonSlider,'Min',1,'Max',255,'Value',255,'SliderStep',[1/254 10/254]);
         set(menu_handles.EpsilonValText,'String','255');
         
         set(menu_handles.FiltParButton1,'String','Iвых(Iвх)');
@@ -2084,7 +2112,7 @@ NumOfRows = get(menu_handles.FiltParMenu1,'Value');
 
 switch get(menu_handles.FilterType,'Value')     % тип обработки
     
-    case 2      % медианный фильтр
+    case {2,28}      % медианный фильтр
         
         switch NumOfRows       % считываем значение маски
             
@@ -3180,11 +3208,11 @@ switch get(menu_handles.FilterType,'Value')
                 end
                 
             case 11
-                B = round(B);                
-                
-        end
-                    
+                B = round(B); 
+        end                    
         
+    case {5,7,11,12,25,26,29}
+        B = round(B);
         
     case 6    	% БИЛАТЕРАЛЬНЫЙ  
         B = round(B*1000)/1000;
@@ -3224,11 +3252,7 @@ switch get(menu_handles.FilterType,'Value')
         else
             set(menu_handles.AlphaSlider,'Enable','on');
             set(menu_handles.AlphaSlider,'Max',B-1,'SliderStep',[1/(B-2) 10/(B-2)]);
-        end
-        
-        
-    case {5,7,11,12,25,26}
-        B = round(B);
+        end       
 
     case 16             %  
         B = round(B);  
@@ -3450,6 +3474,17 @@ switch get(menu_handles.FilterType,'Value')
             set(menu_handles.EpsilonSlider,'Min',D+1,'SliderStep',[1/(255-D-1) 10/(255-D-1)]);
         end
         
+    case 29
+        D = round(D);           % округляем 
+        Et = get(menu_handles.EtaSlider,'Value');
+        if D >= Et
+            D = Et;
+        end
+        
+        set(menu_handles.DeltaSlider,'Value',D);
+        set(menu_handles.DeltaValText,'String',[num2str(D) ' ' char(8804) ' I ' char(8804) ' ' num2str(Et)]);
+        return;
+        
     case 34
         D = round(D);           % округляем 
         Et = get(menu_handles.EtaSlider,'Value');
@@ -3556,6 +3591,19 @@ switch get(menu_handles.FilterType,'Value')
          
          set(menu_handles.EtaSlider,'Value',Et);
          set(menu_handles.DeltaValText,'String',[num2str(D) 'x' num2str(Et)]);
+         return;
+         
+    case 29         % детектор окружностей
+        
+         Et = round(Et);   
+         D = get(menu_handles.DeltaSlider,'Value'); 
+         
+         if Et <= D
+             Et = D;
+         end
+         
+         set(menu_handles.EtaSlider,'Value',Et);
+         set(menu_handles.DeltaValText,'String',[num2str(D) ' ' char(8804) ' I ' char(8804) ' ' num2str(Et)]);
          return;
          
     case 34         % детектор окружностей
@@ -3968,7 +4016,7 @@ switch F(Current,1)     % если фильтр
                         conn = {'минимальное','максимальное'};
                 end
                 
-                subtype = [' кол-во связей: ' conn{F(Current,4)}];
+                subtype = [' кол-во связей: ' conn{F(Current,4)} ','];
                 
             case 10
                 switch size(Original,3)
@@ -4063,7 +4111,7 @@ switch F(Current,1)     % если фильтр
             it_num = num2str(F(Current,8));
         end
         
-        Parametrs(Current) = strcat(Parametrs(Current),' (',type,subtype,' кол-во итераций:',it_num,')');
+        Parametrs(Current) = strcat(Parametrs(Current),' (',type,subtype,' кол-во итераций:',{' '},it_num,')');
         
     case 6              % билатеральные
         
@@ -4341,27 +4389,39 @@ switch F(Current,1)     % если фильтр
         
         Parametrs(Current) = strcat(Parametrs(Current),type);        
         
-    case 28     % Сегментация
+    case 28     % Фильтр локальных статистик
         
-    case 29     % Пороговый
-        
-        if F(Current,4)== 1
-            typ = 'простой';
-        elseif F(Current,4)== 2
-            typ = 'ФНЗ';
-        elseif F(Current,4)== 3
-            typ = 'ФВЗ';
+        switch F(Current,10)
+            case 1
+                type = ' (предельный),';
+            case 2
+                type = ' (энтропийный),';                
+            case 3
+                type = ' (СКО),';                
         end
-        Parametrs(Current) = strcat(Parametrs(Current),[' (' num2str(typ) '), порог: ' num2str(F(Current,3))]);
         
-    case 30     % Пороговый полосовой
+        Parametrs(Current) = strcat(Parametrs(Current),type,mask); 
         
-        if F(Current,4)== 1
-            typ = 'ППФ';
-        elseif F(Current,4)== 2
-            typ = 'ПЗФ';
+    case 29     % Пороговая обработка
+        
+        if F(Current,4) == 1
+            type = [' (Пропускание -> ' num2str(F(Current,3)) '):'];
+        elseif F(Current,4) == 2
+            type = [' (Подавление -> ' num2str(F(Current,3)) '):'];
         end
-        Parametrs(Current) = strcat(Parametrs(Current),[' (' num2str(typ) '), ' num2str(F(Current,3)),' | ' num2str(F(Current,6))]);
+        
+        if F(Current,10 )== 1
+            RGBHSV = ' RGB';
+        elseif F(Current,10) == 2
+            RGBHSV = ' HSV';
+        end
+        
+        range = [', ' num2str(F(Current,8)) ' ' char(8804) ' I ' char(8804) ' ' num2str(F(Current,12))];
+        
+        Parametrs(Current) = strcat(Parametrs(Current),type,RGBHSV,[', канал № ' num2str(F(Current,6))],range);
+        
+    case 30     % 
+        
         
     case 31     % эквализация
         
@@ -4871,7 +4931,7 @@ function MaskTable_CellSelectionCallback(~, eventdata, menu_handles)
 
 switch get(menu_handles.FilterType,'Value')
     
-    case {2,5}      % медианный фильтр и полуотоновая морфология
+    case {2,5,28}      % медианный фильтр и полуотоновая морфология
         
         if size(eventdata.Indices,1) > 0
             Data = get(menu_handles.MaskTable,'Data');
@@ -4971,7 +5031,7 @@ Data = get(gco,'Data');
 if FileName~=0 
     xlswrite([PathName FileName],Data);
 end
-    
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ФУНКЦИИ  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -5071,7 +5131,7 @@ end
 if ~isfloat(Image) 
     Noised = uint8(Noised);
 end
-         
+
 
 % ФУНКЦИЯ ФИЛЬТРАЦИИ 
 function Filtered = Filtration(Image,Filters)
@@ -6240,44 +6300,48 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
                         
             Filtered(:,:,CH) = Col2Filtered(Col,Image(:,:,CH));
             
-        case 28             % ФИЛЬТРЫ ЛОКАЛЬНЫХ СТАТИСТИК
+        case 28             % ФИЛЬТР ЛОКАЛЬНОЙ СТАТИСТИКИ
             
-        case 29             % ПОРОГОВЫЙ ФИЛЬТР                        
-            
-            Filtered = Image(:,:,:)*255;        % переводим в 256 оттенков
-            switch FPM3
-                case 1      % простой
-                    
-                    Filtered(Filtered(:) >= alpha) = 255; % удаляем
-                    Filtered(Filtered(:) < alpha) = 0;
-                    
-                case 2      % ФНЧ
-                    Filtered(Filtered(:) > alpha) = 255;
-                    
-                case 3      % ФВЧ
-                    Filtered(Filtered(:) < alpha) = 0;
-                    
-            end
-            Filtered = uint8(Filtered);
-            return;                       
-            
-        case 30             % ПОРОГОВЫЙ ПОЛОСОВОЙ ФИЛЬТР
-            
-            Filtered = Image(:,:,:)*255;        % переводим в 256 оттенков
-            
-            switch FPM3
-                case 1      % полосно-пропускающий                   
-                    
-                    Filtered(Filtered(:) > beta) = 255; % удаляем 
-                    Filtered(Filtered(:) < alpha) = 0;
-                    
-                case 2      % полосно-задерживающий
-                    
-                    Filtered(Filtered(:) < beta & Filtered(:) > alpha) = 0;                     
+            switch FPM2
+                case 1
+                    Filtered = rangefilt(Image,Mask);
+                case 2
+                    Filtered = entropyfilt(Image,Mask);
+                case 3
+                    Filtered = stdfilt(Image,Mask);
             end
             
-            Filtered = uint8(Filtered);     % возвращаем формат
-            return;                         % выходим из цикла
+            Filtered = uint8(Filtered*255);
+            return;
+            
+        case 29             % ПОРОГОВЫЙ ФИЛЬТР    
+            
+           if FPM2 == 2     % HSV
+                Image = rgb2hsv(Image);
+           end               
+           
+           WorkChannel = Image(:,:,beta);
+           
+           switch FPM3
+               case 1       % пропускание
+                   WorkChannel(delta/255 >= WorkChannel | WorkChannel >= eta/255) = alpha/255;
+               case 2       % подавление
+                   WorkChannel(delta/255 <= WorkChannel | WorkChannel <= eta/255) = alpha/255;                   
+           end
+           
+           Image(:,:,beta) = WorkChannel;
+           
+           if FPM3 == 2     % HSV
+               Image = hsv2rgb(Image);
+           end
+           
+           Filtered = Image;
+           Filtered = uint8(Filtered*255);
+           return;
+           
+            
+        case 30             % 
+            
                 
         case 31         % ЭВАЛИЗАЦИЯ ГИСТОГРАММЫ
             
