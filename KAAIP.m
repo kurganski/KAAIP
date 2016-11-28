@@ -57,6 +57,9 @@ end
 
 % TODO LIST:
 
+%   1) добавить градиент обраотку
+%   2) добавить предупреждения о версии матлаб
+%   3) добавить пропись строчки причины ошибки в окно с ошибкой
 %   8) В мануале сделать инфографикой описание
 
 
@@ -1382,8 +1385,8 @@ FilterType = get(menu_handles.FilterType,'Value');   %считываем значение выбранн
 FilterWithMaskTable = [2 5 11 28];                         % номера фильтров, которым нужно 1я таблица
 FilterWithMaskTable1 = 5;                         % номера фильтров, которым нужно 2я таблица
 FilterWithMenu1 = [2 6 8 9 11 13:14 19 22 24:28];
-FilterWithMenu2 = [2:6 7 9 10 11 14 25:26 28 29 34];                       % номера фильтров, которым нужно 2е меню
-FilterWithMenu3 = [4 9 15 17 18 25 29 31 34];        % номера фильтров, которым нужно 3е меню
+FilterWithMenu2 = [2:6 7 9 10 11 14 25:26 28:30 34];                       % номера фильтров, которым нужно 2е меню
+FilterWithMenu3 = [4 9 15 17 18 25 29:31 34];        % номера фильтров, которым нужно 3е меню
 
                                                 % номера фильтров, которым нужны слайдеры  
 FilterWith_FirstSlider = [3 5:9 10:12 13 15:18 20:23 24:27 29 31:33];        
@@ -1888,7 +1891,8 @@ switch FilterType
                                                             'Оба (утончение)';...
                                                             'Оба (без утончения)'});
         
-    case 16                 % ФИЛЬТР КЕННИ           
+    case 16                 % ФИЛЬТР КЕННИ    
+        
         set(menu_handles.AlphaSlider,'Min',-1,'Max',149,'Value',50,'SliderStep',[1/150 10/150]);
         set(menu_handles.AlphaText,'String','Нижний порог: ');
         set(menu_handles.AlphaValText,'String','50');
@@ -1912,6 +1916,7 @@ switch FilterType
                                                             'Оба'});
                                                         
     case 18                 % ФИЛЬТР РОБЕРСТА
+        
         set(menu_handles.AlphaSlider,'Min',0,'Max',255,'Value',50,'SliderStep',[1/255 10/255]);
         set(menu_handles.AlphaText,'String','Порог: ');
         set(menu_handles.AlphaValText,'String','50');
@@ -1919,21 +1924,25 @@ switch FilterType
         set(menu_handles.FiltParText3,'String','Режим');
         set(menu_handles.FiltParMenu3,'Value',1,'String',{'Утончение';'Без уточнения'});
         
-    case 19                 % ДИСКОВЫЙ            
+    case 19                 % ДИСКОВЫЙ     
+        
         set(menu_handles.FiltParText1,'String','Размер маски');      
         set(menu_handles.FiltParMenu1,'String',{'3x3','5x5','7x7','9x9','11x11','13x13','15x15','17x17','19x19'});
         
-    case 20                 % ФИЛЬТР ЛАПЛАСА ФВЧ        
+    case 20                 % ФИЛЬТР ЛАПЛАСА ФВЧ 
+        
         set(menu_handles.AlphaSlider,'Min',0.01,'Max',1,'Value',0.2,'SliderStep',[0.01/0.99 0.1/0.99]);
         set(menu_handles.AlphaText,'String','СКО = ');
         set(menu_handles.AlphaValText,'String','0.2');
                 
     case 21                 % ПОВЫШЕНИЯ РЕЗКОСТИ
+        
         set(menu_handles.AlphaSlider,'Min',0,'Max',1,'Value',0.1,'SliderStep',[0.01 0.1]);
         set(menu_handles.AlphaText,'String','a = ');
         set(menu_handles.AlphaValText,'String','0.1'); 
                         
     case 23                 % АДАПТИВНЫЙ МЕДИАННЫЙ
+        
         set(menu_handles.FiltParMenu1,'String',{'3x3'});
         set(menu_handles.IndentMenu,'String',{'зеркальное','нули'});
         M = min(size(Original,1),size(Original,2));
@@ -2064,8 +2073,16 @@ switch FilterType
         
         set(menu_handles.EtaSlider,'Min',1,'Max',255,'Value',255,'SliderStep',[1/254 10/254]);                        
         
-    case 30                 % 
-         
+    case 30                 % ГРАДИЕНТ        
+        
+        set(menu_handles.FiltParText2,'String','Результат');
+        set(menu_handles.FiltParMenu2,'String',{'Амплитуда градиента',...
+                                                'Направление градиента',...
+                                                'Направленный градиент по Ох',...
+                                                'Направленный градиент по Оy'}); 
+        
+        set(menu_handles.FiltParText3,'String','Метод');
+        set(menu_handles.FiltParMenu3,'String',{'Собеля','Превитта','Центральной разности','Средней разности','Робертса'});         
         
     case 31                 % ЭКВАЛИЗАЦИЯ ГИСТОГРАММЫ
         
@@ -2784,6 +2801,18 @@ switch get(menu_handles.FilterType,'Value')     % тип обработки
                     menu_handles.BetaText;...
                     menu_handles.BetaValText;...
                     ],'Visible','on');
+        end        
+        
+    case 30        % градиент
+        
+        switch get(menu_handles.FiltParMenu2,'Value')
+            case {1,2}
+                set(menu_handles.FiltParMenu3,'String',{'Собеля','Превитта',...
+                    'Центральной разности','Средней разности','Робертса'});
+                
+            case {3,4}
+                set(menu_handles.FiltParMenu3,'String',{'Собеля','Превитта',...
+                    'Центральной разности','Средней разности'});
         end
         
     case 34     % детектор окружностей
@@ -4539,8 +4568,33 @@ switch F(Current,1)     % если фильтр
         
         Parametrs(Current) = strcat(Parametrs(Current),type,RGBHSV,[', канал № ' num2str(F(Current,6))],range);
         
-    case 30     % 
+    case 30     % градиент        
         
+        switch F(Current,10)
+            case 1
+                type = 'Амплитуда градиента';
+            case 2
+                type = 'Направление градиента';                
+            case 3
+                type = 'Направленный градиент по Ох';                     
+            case 4
+                type = 'Направленный градиент по Оy';               
+        end
+        
+        switch F(Current,4)
+            case 1
+                method = ' Собеля';
+            case 2
+                method = ' Превитта';          
+            case 3
+                method = ' центральной разности';                
+            case 4
+                method = ' средней разности';           
+            case 5
+                method = ' Робертса';                
+        end
+        
+        Parametrs(Current) = strcat(Parametrs(Current),' (',type,method,')');        
         
     case 31     % эквализация
         
@@ -6477,8 +6531,34 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
            return;
            
             
-        case 30             % 
+        case 30         % ГРАДИЕНТ
             
+            switch FPM3
+                case 1
+                    method = 'Sobel';
+                case 2
+                    method = 'Prewitt';
+                case 3
+                    method = 'CentralDifference';
+                case 4
+                    method = 'IntermediateDifference';
+                case 5
+                    method = 'Roberts';
+            end
+            
+            switch FPM2
+                case 1
+                    [Filtered(:,:,CH),~] = imgradient(Image(:,:,CH),method);
+                case 2
+                    [~,Filtered(:,:,CH)] = imgradient(Image(:,:,CH),method);
+                case 3
+                    [Filtered(:,:,CH),~] = imgradientxy(Image(:,:,CH),method);
+                case 4
+                    [~,Filtered(:,:,CH)] = imgradientxy(Image(:,:,CH),method);
+            end
+            
+            % нормировка !!! для направления -180 до 180 сделать
+            Filtered(:,:,CH) = 255*Filtered(:,:,CH)/max(max(Filtered(:,:,CH)));
                 
         case 31         % ЭВАЛИЗАЦИЯ ГИСТОГРАММЫ
             
@@ -7434,7 +7514,7 @@ Ystring = -round(get(analyzer_handles.StringSlider,'Value'));
 Area = imshow(Original(:,:,1),'Parent',analyzer_handles.AreaAxes);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Hist = BuildHist(analyzer_handles.AreaAxesHist,Image(Y0:Y1,X0:X1),{'Гистограмма области интереса',' '});
+Hist = BuildHist(analyzer_handles.AreaAxesHist,Image(Y0:Y1,X0:X1),'Гистограмма');
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 ResLevel = double(Image(Ystring,Xrow)*get(analyzer_handles.ResLevelSlider,'Value'));
