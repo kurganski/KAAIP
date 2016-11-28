@@ -55,13 +55,6 @@ for i = 1:size(toolboxes,2)
     end
 end
 
-% TODO LIST:
-
-%   1) добавить градиент обраотку
-%   2) добавить предупреждения о версии матлаб
-%   3) добавить пропись строчки причины ошибки в окно с ошибкой
-%   8) В мануале сделать инфографикой описание
-
 
 %%%%%%%%%%%%%%%%%%%%%% МЕНЮ ИСХОДНОГО ИЗОБРАЖЕНИЯ %%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -75,9 +68,10 @@ global Filtered;
 
 %%%%%%%%%%%%% ПРОВЕРКИ
 
+warning('off'); %#ok<WNOFF>
+
 if isempty(handles)            % значит неумный человек запустил fig вместо m  
     
-    warning('off'); %#ok<WNOFF>
     ok = questdlg({'Вы запустили файл с расширением *.fig вместо расширения *.m.';...
         'Нажмите "OK", и все будет хорошо'},...
         'KAAIP','OK','modal');
@@ -86,7 +80,6 @@ if isempty(handles)            % значит неумный человек запустил fig вместо m
     if ~isempty(ok) || isempty(ok)      
         close(gcf);
         run('KAAIP.m');
-        warning('on'); %#ok<WNON>
         return;
     end
 end
@@ -98,21 +91,30 @@ for i = 1:size(toolboxes,2) % проходимся по каждому
     if strcmp('Image Processing Toolbox',toolboxes(i).Name) == 1
         good = true;
         break;      % если такой тулбокс есть, то все ок        
-    end    
+    end 
 end
 
 if ~good
-    warning('off'); %#ok<WNOFF>
-    ok = questdlg({ 'Ваша версия Matab не содержит необходимого расширения "Image Processing Toolbox", но вы держитесь здесь';...
+    ok = questdlg({ 'Ваша версия Matlab не содержит необходимого расширения "Image Processing Toolbox", но вы держитесь здесь';...
                     'Приложение будет закрыто. Вам всего доброго, хорошего настроения и здоровья.';
                     'С установкой расширения все будет хорошо!'},'KAAIP','OK','modal');
     
     if ~isempty(ok) || isempty(ok)
         close(gcf);
-        warning('on'); %#ok<WNON>
         return;
     end
 end
+
+   
+matlab_version = toolboxes(i).Release;
+matlab_version = str2double(matlab_version(3:6));
+if matlab_version < 2015
+    questdlg({ 'Ваша версия Matlab ниже версии 2015';...
+                'Возможны ошибки и некорректное поведение программы';...
+                'Рекомендуем обновить версию Matlab'},'KAAIP','OK','modal');
+end
+
+warning('on'); %#ok<WNON>
 
 %%%%%%%%% ЗДЕСЬ УЖЕ ПЫТАЕМСЯ ОТКРЫТЬ
 
@@ -4954,43 +4956,46 @@ for k = 1:size(Noises,1)
     %     set(Wait, 'WindowStyle','modal');
     waitbar(k/(size(Noises,1)+1),Wait,['Обработка изображения № ' num2str(k)]);
     
-    % если используем предыдущее отфильтрованное изображение
-    if Noises(k,4) == 1
-        
-        try 
-            Im = Temp_Filtered(:,:,:,k-1);
-        catch ME
-            delete(Wait);
-            delete(menu_handles.menu);      % закрываем меню-окно          
-            errordlg(['Искажение изображения потерпело неудачу в строке № ' num2str(ME.stack(1).line)],'KAAIP','modal');
-            return;
+    %%%%%%%%%%% ИСКАЖЕНИЕ  
+    try
+        % если используем предыдущее отфильтрованное изображение   
+        if Noises(k,4) == 1            
+            Im = Temp_Filtered(:,:,:,k-1);            
+        else
+            Im = Original;
         end
         
-    else
-        Im = Original;
+        % надо ли использовать предыдущ отфильтр. как зашумленное
+        if isempty(FilteredAsOriginal)
+            
+            Temp_Noised(:,:,:,k) = Noising( Im,...
+                Noises(k,1),...
+                Noises(k,2),...
+                Noises(k,3));  % зашумили
+            
+        else                  % исп. отфильтрованное как зашумленное
+            Temp_Noised(:,:,:,k) = Noising( FilteredAsOriginal,...
+                Noises(k,1),...
+                Noises(k,2),...
+                Noises(k,3));  % зашумили
+        end
+        
+    catch ME
+        delete(Wait);
+        delete(menu_handles.menu);      % закрываем меню-окно
+        errordlg({['Искажение изображения потерпело неудачу в строке № ' num2str(ME.stack(1).line)]; ME.message},'KAAIP','modal');
+        return;
     end
     
-    % надо ли использовать предыдущ отфильтр. как зашумленное
-    if isempty(FilteredAsOriginal)
-        
-        Temp_Noised(:,:,:,k) = Noising( Im,...
-            Noises(k,1),...
-            Noises(k,2),...
-            Noises(k,3));  % зашумили
-        
-    else                  % исп. отфильтрованное как зашумленное
-        Temp_Noised(:,:,:,k) = Noising( FilteredAsOriginal,...
-            Noises(k,1),...
-            Noises(k,2),...
-            Noises(k,3));  % зашумили
-    end
+    %%%%%%%%%%%%%%%%%% ОБРАБОТККА
     
     try
         Temp_Filtered(:,:,:,k) = Filtration(Temp_Noised(:,:,:,k),Filters(k));
     catch ME
         delete(Wait);
         delete(menu_handles.menu);      % закрываем меню-окно
-        errordlg(['Обработка изображения потерпела неудачу в строке № ' num2str(ME.stack(1).line)],'KAAIP','modal');
+        errordlg({['Обработка изображения потерпела неудачу в строке № ' num2str(ME.stack(1).line)];...
+                ME.message},'KAAIP','modal');
         return;
     end
     
@@ -6549,16 +6554,17 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
             switch FPM2
                 case 1
                     [Filtered(:,:,CH),~] = imgradient(Image(:,:,CH),method);
+                    Filtered(:,:,CH) = Filtered(:,:,CH)/max(max(Filtered(:,:,CH)));
                 case 2
                     [~,Filtered(:,:,CH)] = imgradient(Image(:,:,CH),method);
+                    Filtered(:,:,CH) = Filtered(:,:,CH)/360;
                 case 3
                     [Filtered(:,:,CH),~] = imgradientxy(Image(:,:,CH),method);
+                    Filtered(:,:,CH) = Filtered(:,:,CH)/max(max(Filtered(:,:,CH)));
                 case 4
                     [~,Filtered(:,:,CH)] = imgradientxy(Image(:,:,CH),method);
+                    Filtered(:,:,CH) = Filtered(:,:,CH)/max(max(Filtered(:,:,CH)));
             end
-            
-            % нормировка !!! для направления -180 до 180 сделать
-            Filtered(:,:,CH) = 255*Filtered(:,:,CH)/max(max(Filtered(:,:,CH)));
                 
         case 31         % ЭВАЛИЗАЦИЯ ГИСТОГРАММЫ
             
