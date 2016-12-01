@@ -907,6 +907,8 @@ ChannelSlider_Callback(hObject, eventdata, handles);
 % ВЫПАДАЮЩИЙ СПИСОК НА ПАНЕЛИ ЗАШУМЛЕННЫХ ИЗОБРАЖЕНИЙ
 function NoisedMenu_Callback(hObject, eventdata, handles)
 
+set(handles.FiltAgainNoised,'Label',...
+    ['Обработать искаженное изображение № ' num2str(get(handles.NoisedMenu,'Value'))]);
 ChannelSlider_Callback(hObject, eventdata, handles);
 
 
@@ -914,7 +916,7 @@ ChannelSlider_Callback(hObject, eventdata, handles);
 function FilteredMenu_Callback(hObject, eventdata, handles)
 
 set(handles.FiltAgain,'Label',...
-    ['Обработка обработанного изображения № ' num2str(get(handles.FilteredMenu,'Value'))]);
+    ['Обработать ранее обработанное  изображение № ' num2str(get(handles.FilteredMenu,'Value'))]);
 ChannelSlider_Callback(hObject, eventdata, handles);
 
 
@@ -1154,6 +1156,7 @@ function Filtration_Callback(hObject, eventdata, handles)
 global Parametrs;           % параметры эксперимента (шумы и фильтры)
 global Noises;              % список параметров зашумления
 global Filters;             % список параметров фильтрации
+global Noised;              % зашумленный вариант
 global Filtered;            % отфильтрованное изображение
 global FilteredAsOriginal;  % ранее обработанное изображение
 global ContinueProcessing;  % лог переменная того, что нужно продолжить обработку, не удаляя результат предыдущей
@@ -1183,6 +1186,10 @@ end
 if hObject == handles.FiltAgain(1) || hObject == handles.FiltAgain(2)      
     
     FilteredAsOriginal = Filtered(:,:,:,get(handles.FilteredMenu,'Value'));
+    
+elseif hObject == handles.FiltAgainNoised(1) || hObject == handles.FiltAgainNoised(2)    
+    
+    FilteredAsOriginal = Noised(:,:,:,get(handles.NoisedMenu,'Value'));
 else        
     FilteredAsOriginal = [];
 end
@@ -5081,7 +5088,8 @@ ShowMenu_Callback(hObject, eventdata, handles);
 AssessMenu_Callback(hObject, eventdata, handles);
 
 % выставляем начальные значения и делаем видимыми объекты
-set(handles.FiltAgain,'Label','Обработка обработанного изображения № 1');
+set(handles.FiltAgain,'Label','Обработать ранее обработанное изображение № 1');
+set(handles.FiltAgainNoised,'Label','Обработать искаженное изображение № 1');
 
 set(handles.NoiseFilterList,'String',Parametrs,'Value',1);
 set(handles.GraphSlider,'Value',1);
@@ -5097,6 +5105,7 @@ set([   handles.NoisePanel;...
 
 set(handles.NoiseFilterListMenu,'Enable','on');
 set(handles.FiltAgain,'Enable','on');
+set(handles.FiltAgainNoised,'Enable','on');
 set(handles.ContinueProcessing,'Enable','on');
 
 if size(Noised,4) > 1       % если в списке более 1й обработки, тогда можно что-то удалять
