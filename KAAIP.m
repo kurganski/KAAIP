@@ -6640,7 +6640,7 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
                 
                 case 3                  % триколор
 %                     
-                    warning('off');                    
+                    warning('off','all');                    
                     if FPM2 == 1
                         [centers, rads] = imfindcircles(Image,[delta eta],...
                                             'ObjectPolarity',OP,'Method',method,...
@@ -6650,7 +6650,7 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
                                             'ObjectPolarity',OP,'Method',method,...
                                             'EdgeThreshold',gamma/255);                          
                     end
-                    warning('on');    
+                    warning('on','all');    
                     
                     for x = 1:length(rads)
                         points = GetCirclePoints(centers(x,1),centers(x,2),rads(x),Filtered(:,:,CH));                        
@@ -6668,7 +6668,7 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
                     
                 otherwise               % мультиканальные                    
                     
-                    warning('off');                 
+                    warning('off','all');                 
                     if FPM2 == 1
                         [centers, rads] = imfindcircles(Image(:,:,CH),[delta eta],...
                                             'ObjectPolarity',OP,'Method',method,...
@@ -6678,7 +6678,7 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
                                             'ObjectPolarity',OP,'Method',method,...
                                             'EdgeThreshold',gamma/255);                          
                     end                                       
-                    warning('on');      
+                    warning('on','all');      
                     
                     for x = 1:length(rads)
                         points = GetCirclePoints(centers(x,1),centers(x,2),rads(x),Filtered(:,:,CH));
