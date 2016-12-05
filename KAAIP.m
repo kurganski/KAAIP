@@ -1388,7 +1388,7 @@ end
 
 
 % —ѕ»—ќ  ‘»Ћ№“–ќ¬
-function FilterType_Callback(hObject,eventdata,menu_handles)
+function FilterType_Callback(~,~,menu_handles)
 
 global Original;        % зашумленный вариант
 
@@ -1415,37 +1415,38 @@ FilterWith_Exp_beta_Button = [4:6 32];
         
 FilterWithIndends = [2 6 8 11 13:14 19:27];  % фильтры с выбором типа расширени€ границ
 
-% пр€чем и активируем все, а потом октрываем то, что нужно
+% пр€чем, устанавливаем в 1 и активируем все элементы, а потом открываем то, что нужно
 ItemsToHide = get(menu_handles.uipanel3,'Children');
 set(ItemsToHide,'Visible','off','Enable','on');
 set(menu_handles.FilterType,'Visible','on');
 set(menu_handles.IndentMenu,'String',{'зеркальное','нули','круговое','копи€'});
 set(menu_handles.MaskText,'String','');
+set([...
+    menu_handles.IndentMenu;...
+    menu_handles.FiltParMenu1;...
+    menu_handles.FiltParMenu2;...
+    menu_handles.FiltParMenu3;...
+    ],'Value',1);
 
 %%%% смотрим, какие элементы нужно показать
 if any(FilterWithIndends == FilterType)       % если выбранному фильтру нужно меню расширени€ границ
    set([menu_handles.IndentMenu; menu_handles.IndentText],'Visible','on');
-   set(menu_handles.IndentMenu,'Value',1);
 end
 
 if any(FilterWithMenu1 == FilterType)       % если выбранному фильтру нужно 1е меню
    set([menu_handles.FiltParMenu1; menu_handles.FiltParText1],'Visible','on');
-   set(menu_handles.FiltParMenu1,'Value',1);
 end
 
 if any(FilterWithMenu2 == FilterType)       % если выбранному фильтру нужно 2е меню
     set([menu_handles.FiltParMenu2; menu_handles.FiltParText2],'Visible','on');
-    set(menu_handles.FiltParMenu2,'Value',1);
 end
 
 if any(FilterWithMenu3 == FilterType)       % если выбранному фильтру нужно 3е меню
     set([menu_handles.FiltParText3 menu_handles.FiltParMenu3],'Visible','on');
-    set(menu_handles.FiltParMenu3,'Value',1);
 end
 
 if any(FilterWithMaskTable == FilterType)    % если выбранному фильтру нужно меню масок
     set([menu_handles.MaskText menu_handles.MaskTable],'Visible','on');
-    set(menu_handles.FiltParMenu1,'Value',1);
 end
 
 if any(FilterWithMaskTable1 == FilterType)    % если выбранному фильтру нужно меню масок
@@ -5064,6 +5065,7 @@ set(handles.NoisedMenu,'String',str,'Value',1,'Enable','on');
 set(handles.FilteredMenu,'String',str,'Value',1,'Enable','on');
 handles.AssessMenu.Value = 1;
 set(handles.Noised,'Enable','on');
+set(handles.Filtered,'Enable','on');
 
 ShowMenuString = handles.ShowMenu.String;
 if ~strcmp(ShowMenuString{end},'SSIM-изображени€');
