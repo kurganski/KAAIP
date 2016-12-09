@@ -2061,7 +2061,7 @@ switch FilterType
             str = {'RGB'};
         end
         
-        set(menu_handles.FiltParText2,'String','Цветовая схема');    
+        set(menu_handles.FiltParText2,'String','Цветовая модель');    
         set(menu_handles.FiltParMenu2,'String',str);
         
         
@@ -2103,7 +2103,7 @@ switch FilterType
         set(menu_handles.AlphaValText,'String','64'); 
         set(menu_handles.AlphaText,'String','Число уровней:');
         
-        set(menu_handles.FiltParText3,'String','Цвет. пространство');        
+        set(menu_handles.FiltParText3,'String','Цветовая модель');        
         if size(Original,3) == 3
             set(menu_handles.FiltParMenu3,'Value',1,'String',{'RGB';'HSV'});
         else
@@ -2154,7 +2154,7 @@ switch FilterType
         set(menu_handles.FiltParText3,'String','Цели');
         set(menu_handles.FiltParMenu3,'Value',1,'String',{'Темнее фона';'Светлее фона'});
         
-        set(menu_handles.BetaText,'String','Чувствительсность: ');
+        set(menu_handles.BetaText,'String','Чувствительность: ');
         set(menu_handles.BetaSlider,'Min',0.01,'Max',1,'Value',0.5,'SliderStep',[0.01/0.99 0.1/0.99]);
         set(menu_handles.BetaValText,'String','0.5'); 
         
@@ -5571,7 +5571,7 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
                                 f0Col = f0Cols(5,:)+T0;
                                 
                                 Col(Col >= f0Col) = 1;
-                                Col(Col <= f0Col) = 0;                        
+                                Col(Col < f0Col) = 0;                        
                         end
                         
                         Filtered(:,:,ch) = Col2Filtered(Col,Im);
