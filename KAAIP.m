@@ -1673,11 +1673,11 @@ switch FilterType
         set(menu_handles.FiltParText2,'String','Целевой пиксель');
         set(menu_handles.FiltParMenu2,'String',{'исходный','медиана','ср. арифметическое','мин. разность','адаптивная медиана','N-мерная медиана'});
         
-        set(menu_handles.AlphaSlider,'Min',0.001,'Max',0.1,'Value',0.001,'SliderStep',[0.001/0.099 0.01/0.099]);
+        set(menu_handles.AlphaSlider,'Min',0.01,'Max',3,'Value',0.01,'SliderStep',[0.01/2.99 0.1/2.99]);
         set(menu_handles.AlphaText,'String',[char(945) ' = ']);
-        set(menu_handles.AlphaValText,'String','0.001');
+        set(menu_handles.AlphaValText,'String','0.01');
         
-        set(menu_handles.BetaSlider,'Min',0.01,'Max',1,'Value',0.01,'SliderStep',[0.01/0.99 0.1/0.99]);
+        set(menu_handles.BetaSlider,'Min',0.01,'Max',3,'Value',0.01,'SliderStep',[0.01/2.99 0.1/2.99]);
         set(menu_handles.BetaText,'String',[char(946) ' = ']);
         set(menu_handles.BetaValText,'String','0.01');
         
@@ -3149,8 +3149,9 @@ switch get(menu_handles.FilterType,'Value')
     case {3,4,5,7,12,24,27,29,31,32}         % ПОРОГОВЫЙ
         A = round(A);
         
-    case 6    % БИЛАТЕРАЛЬНЫЙ
-        A = round(A*1000)/1000;
+    case {6,8,13,20,21,22,33}    % БИЛАТЕРАЛЬНЫЙ, ГАБОРА, НИЗКИХ ЧАСТОТ ГАУССА, ГАУССА+ЛАПЛАСА, 
+               
+        A = round(A*100)/100;
         
     case 9      % ПРЕОБРАЗОВАНИЕ ХАФА        
 
@@ -3194,12 +3195,7 @@ switch get(menu_handles.FilterType,'Value')
         
     case {11,25}
         A = round(A);
-        
-        
-    case {8,13,20,21,22,24,27,33}      % ГАБОРА, НИЗКИХ ЧАСТОТ ГАУССА, ГАУССА+ЛАПЛАСА, АДАПТИВНЫЙ ЛИ,
-                                        % АДАПТИВНЫЙ ФРОСТА, УЛУЧШЕННЫЙ АДАПТИВНЫЙ ФРОСТА
-        A = round(A*100)/100;
-        
+                        
     case 14                 % усредняющий фильтр
         
         if get(menu_handles.FiltParMenu2,'Value') == 4            
@@ -3280,7 +3276,7 @@ RewriteTextString = 0;                  % не надо переписывать текстовую строку
 
 switch get(menu_handles.FilterType,'Value')
     
-    case {3,8,32,34}       % бинаризация
+    case {3,6,8,32,34}       % бинаризация, билатеральный
         
         B = round(B*100)/100;           % округляем
     
@@ -3332,10 +3328,7 @@ switch get(menu_handles.FilterType,'Value')
         
     case {5,7,11,12,25,26,29}
         B = round(B);
-        
-    case 6    	% БИЛАТЕРАЛЬНЫЙ  
-        B = round(B*1000)/1000;
-        
+                
     case 9      % ПРЕОБРАЗОВАНИЕ ХАФА
         
         B = round(B);
