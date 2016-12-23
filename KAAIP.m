@@ -20,6 +20,12 @@ function varargout = KAAIP_OutputFcn(~, ~, handles)
 varargout{1} = handles.output;
 function KAAIP_CloseRequestFcn(hObject, ~, ~)
 
+global format;
+
+warning('off','all');
+delete(['TempImage.' format]);
+
+clear global format;
 clear global Original;
 clear global Filtered;
 clear global Noised;
@@ -28,6 +34,7 @@ clear global Parametrs;           % параметры эксперимента (шумы и фильтры)
 clear global Noises;              % список параметров зашумления
 clear global Filters;             % список параметров фильтрации
 delete(hObject);
+
 
 function KAAIP_OpeningFcn(hObject, ~, handles, varargin)
 
@@ -41,25 +48,9 @@ fig = get(handles.KAAIP,'Position');  % получили координаты окна
 set(handles.KAAIP,'Position',[(scr_res(3)-fig(3))/2 (scr_res(4)-fig(4))/2 fig(3) fig(4)]);
 
 
-
 toolboxes = ver();      % считываем наличие тулбоксов
-for i = 1:size(toolboxes,2)
-    
-    if strcmp('Image Acquisition Toolbox',toolboxes(i).Name) == 1
-        
-        try
-            CamAdaptors = imaqhwinfo('winvideo');                   % считываем подключенные камеры системы виндовоз
-            if ~isempty(CamAdaptors.DeviceIDs)                      % если подключена хоть одна
-                set(handles.ImageAcquisitionMenu,'Enable','on');    % меню доступно
-            end
-        catch
-        end
-    end
-end
-
-
 warning('off','all');
-matlab_version = toolboxes(i).Release;
+matlab_version = toolboxes(1).Release;
 matlab_version = str2double(matlab_version(3:6));
 if matlab_version < 2015
     questdlg({ 'Ваша версия Matlab ниже версии 2015';...
@@ -248,12 +239,6 @@ set(handles.View_Original,'Enable','on');               % разблокировали исходны
 ShowMenu_Callback(hObject, eventdata, handles);    % выполняем функцию отображения
 
 
-% МЕНЮ "ПОЛУЧИТЬ СНИМОК С КАМЕРЫ"
-function ImageAcquisitionMenu_Callback(~, ~, ~)
-
-imaqtool;
-
-
 % МЕНЮ "ПРОСМОТР" ИСХОДНОГО ИЗОБРАЖЕНИЯ
 function View_Original_Callback(hObject, ~, handles)
 
@@ -276,7 +261,11 @@ else                                        % если вызывающая  функция была "пок
     Image(:,:,3) = Im(:,:,get(handles.Blue,'Value'));
 end
 
-imtool(Image);
+try
+    imtool(Image);
+catch
+    OpenImageOutside(Image);
+end
 
 
 % МЕНЮ "КОПИРОВАТЬ" ИСХОДНОЕ ИЗОБРАЖЕНИЕ В БУФЕР
@@ -477,7 +466,12 @@ if ~isempty(where)                              % если он есть
         end
     end
     
-    imtool(Data);
+    try
+        imtool(Data);
+    catch
+        OpenImageOutside(Data);
+    end
+    
 else    
     h = errordlg('В выбранной строке отсутствует хэш','KAAIP');
     set(h, 'WindowStyle', 'modal');    
@@ -3804,7 +3798,11 @@ else
     Image = I(:,:,:);
 end
 
-imtool(Image);       % вызываем функцию создания окна для изображения
+try     
+    imtool(Image); 
+catch
+    OpenImageOutside(Image); 
+end
 
 
 % КНОПКА "ГИСТОГРАММА ИЗОБРАЖЕНИЯ"
@@ -4852,7 +4850,13 @@ switch get(menu_handles.FilterType,'Value')
                 end
                 
                 object = getnhood(structure);
-                imtool(object);
+                
+                try
+                    imtool(object);
+                catch
+                    OpenImageOutside(object);
+                end
+                
                 return;
                 
             case 11     % успех/неудача
@@ -4871,7 +4875,13 @@ switch get(menu_handles.FilterType,'Value')
         Data = menu_handles.MaskTable1.Data;
         LogicData = menu_handles.MaskTable.Data;        
         object = Data.*LogicData/255;        
-        imtool(object);
+        
+        try
+            imtool(object);
+        catch
+            OpenImageOutside(object);
+        end
+        
         return;
         
     case 6                     % билатеральные фильтры
@@ -6154,7 +6164,12 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
                 end
                 
                 if FPM1 == 2      % если нужно вывести STM
-                    imtool(H/max(H(:)));
+                    
+                    try
+                        imtool(H/max(H(:)));
+                    catch
+                        OpenImageOutside(H/max(H(:)));
+                    end
                 end
             end
             
@@ -7414,6 +7429,17 @@ points(:,2) = points_y;
 points = unique(points,'rows');
 
 
+% ФУНКЦИЯ, ОТКРЫВАЮЩАЯ КАРТИНУК ПРИЛОЖЕНИЕМ ВИНДЫ
+function OpenImageOutside(Image)
+
+global format;
+
+% сохраняем картинку в корне и открываем ее осевым просмотрщиком
+% перед закрытием удаляем файл
+imwrite(Image,['TempImage.' format]);
+winopen(['TempImage.' format]);
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%% ФУНКЦИИ "IMAGE ANALYZER" %%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -8049,7 +8075,12 @@ switch get(analyzer_handles.ImageMenu,'Value')
 end
 
 Image = Image(Y0:Y1,X0:X1,:);  % вырезали фрагмент
-imtool(Image);                  % запустили просмотр в окне
+
+try     
+    imtool(Image); 
+catch
+    OpenImageOutside(Image); 
+end
 
 
 % КОНТЕКСТНОЕ МЕНЮ "КОПИРОВАТЬ" 
