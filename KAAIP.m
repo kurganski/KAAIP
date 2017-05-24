@@ -36,42 +36,64 @@ clear global Filters;             % список параметров фильтрации
 delete(hObject);
 
 
+% ФУНКЦИЯ ПЕРЕД ОТКРЫТИЕМ ПРИЛОЖЕНИЯ
 function KAAIP_OpeningFcn(hObject, ~, handles, varargin)
 
 global StatAndMLT;
+global CV;
 
 handles.output = hObject;
 guidata(hObject, handles);
 scr_res = get(0, 'ScreenSize');     % получили разрешение экрана
 fig = get(handles.KAAIP,'Position');  % получили координаты окна
+
 % отцентрировали окно
 set(handles.KAAIP,'Position',[(scr_res(3)-fig(3))/2 (scr_res(4)-fig(4))/2 fig(3) fig(4)]);
-
 
 toolboxes = ver();      % считываем наличие тулбоксов
 warning('off','all');
 matlab_version = toolboxes(1).Release;
 matlab_version = str2double(matlab_version(3:6));
-if matlab_version < 2015
-    questdlg({ 'Ваша версия Matlab ниже версии 2015';...
-                'Возможны ошибки и некорректное поведение программы';...
-                'Рекомендуем обновить версию Matlab'},'KAAIP','OK','modal');
+
+
+if matlab_version < 2015    
+    message_str = { 'Ваша версия Matlab ниже версии R2015a';...
+                    'Возможны ошибки и некорректное поведение программы'};
 end
 
-if matlab_version < 2015
-    questdlg({  'Ваша версия Matab не содержит расширение "Statistics and Machine Learning Toolbox".';...
-                'В списке искажений экспоненциальный шум и шум Рэлея недоступны'},'KAAIP','OK','modal');
-end
-
-toolboxes = ver();          % считываем наличие тулбоксов
-StatAndMLT = false;
-for i = 1:size(toolboxes,2) % проходимся по каждому
+StatAndMLT = false;         % проверка расширения Statistics and Machine Learning Toolbox
+for i = 1:size(toolboxes,2) % проходимся по каждому тулбоксу
 
     if strcmp('Statistics and Machine Learning Toolbox',toolboxes(i).Name) == 1
         StatAndMLT = true;
-        break;      % если такой тулбокс есть, то все ок
+    end
+end    
+
+CV = false;     % проверка расширения Computer Vision System Toolbox
+for i = 1:size(toolboxes,2) % проходимся по каждому
+
+    if strcmp('Computer Vision System Toolbox',toolboxes(i).Name) == 1
+        CV = true;
     end
 end
+
+if ~ StatAndMLT     % нет расширения - дополняем инфо строку
+    message_str = [ message_str;...
+                    'Отсутствует расширение "Statistics and Machine Learning Toolbox":';...
+                    'В списке искажений экспоненциальный шум и шум Рэлея недоступны'];
+end
+
+if ~ CV 
+    message_str = [ message_str;...
+                    'Отсутствует расширение "Computer Vision System Toolbox":';...
+                    'В списке обработок детекторы ключевых точек недоступны'];
+end
+
+                        
+if ~isempty(message_str)    % вывод сообщения
+    questdlg(message_str,'KAAIP','OK','modal');
+end 
+
 
 %%%%%%%%%%%%%%%%%%%%%% МЕНЮ ИСХОДНОГО ИЗОБРАЖЕНИЯ %%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -231,7 +253,7 @@ else                        % ЕСЛИ Ч/Б ИЗОБРАЖЕНИЕ
 end
 
 set(handles.OriginalPanel,'Visible','on');      % отобразили панель
-set(handles.Utilits,'Enable','on');
+set(handles.RunImageAnalyzer,'Enable','on');
 set(handles.CopyOriginalImage,'Enable','on');
 set(handles.FiltrationMenu,'Enable','on');              % разблокировали меню фильтрации
 set(handles.View_Original,'Enable','on');               % разблокировали исходный масштаб
@@ -1155,6 +1177,8 @@ global Filtered;            % отфильтрованное изображение
 global FilteredAsOriginal;  % ранее обработанное изображение
 global ContinueProcessing;  % лог переменная того, что нужно продолжить обработку, не удаляя результат предыдущей
 global StatAndMLT;
+global CV
+global Original;
 
 Noises(:,:) = [];       
 Filters = struct([]);  
@@ -1237,35 +1261,15 @@ Menu.Visible = 'on';
 
 
 if ~StatAndMLT
-    str = {...
-        'Искажение отсутствует';
-        'Нормальный шум';
-        'Шум Пуассона';
-        'Шум Лапласа';
-        'Равномерный шум';
-        'Спекл-шум';
-        'Шум "соль-перец"';
-        'Шум "соль"';
-        'Шум "перец"';
-        'Смазывание'
-        };
-    set(menu_handles.NoiseType,'String',str);
-else
-    str = {...
-        'Искажение отсутствует';
-        'Нормальный шум';
-        'Шум Пуассона';
-        'Шум Лапласа';
-        'Равномерный шум';
-        'Спекл-шум';
-        'Шум "соль-перец"';
-        'Шум "соль"';
-        'Шум "перец"';
-        'Смазывание';
-        'Шум Рэлея';
-        'Экспоненциальный шум'...
-        };
-    set(menu_handles.NoiseType,'String',str);    
+    str = menu_handles.NoiseType.String;
+    str = str(1:end-2,:); 
+    menu_handles.NoiseType.String = str;    
+end
+
+if ~CV
+    str = menu_handles.FilterType.String;
+    str = str(1:end-1,:); 
+    menu_handles.FilterType.String = str;    
 end
 
 
@@ -1391,14 +1395,14 @@ FilterType = get(menu_handles.FilterType,'Value');   %считываем значение выбранн
 FilterWithMaskTable = [2 5 11 28];                         % номера фильтров, которым нужно 1я таблица
 FilterWithMaskTable1 = 5;                         % номера фильтров, которым нужно 2я таблица
 FilterWithMenu1 = [2 6 8 9 11 13:14 19 22 24:28];
-FilterWithMenu2 = [2:6 7 9 10 11 14 25:26 28:30 34];                       % номера фильтров, которым нужно 2е меню
+FilterWithMenu2 = [2:6 7 9 10 11 14 25:26 28:30 34:35];                       % номера фильтров, которым нужно 2е меню
 FilterWithMenu3 = [4 9 15 17 18 25 29:31 34];        % номера фильтров, которым нужно 3е меню
 
                                                 % номера фильтров, которым нужны слайдеры  
-FilterWith_FirstSlider = [3 5:9 10:12 13 15:18 20:23 24:27 29 31:33];        
-FilterWith_SecondSlider = [4 5:9 10:12 16 29 32:34];      
+FilterWith_FirstSlider = [3 5:9 10:12 13 15:18 20:23 24:27 29 31:33 35];        
+FilterWith_SecondSlider = [4 5:9 10:12 16 29 32:35];      
 FilterWith_ThirdSlider = [5 7:11 16 33 34];
-FilterWith_FourthSlider = [4 5 7:10 29 33 34];
+FilterWith_FourthSlider = [4 5 7:10 29 33:35];
 FilterWith_FifthSlider = [8 9 33];
 FilterWith_SixthSlider = 9;
 FilterWith_SeventhSlider = [9 29 34];
@@ -2168,6 +2172,37 @@ switch FilterType
         
         set(menu_handles.EtaSlider,'Min',10,'Max',MS,'Value',11,...
                                     'SliderStep',[1/(MS-10) 10/(MS-10)]); 
+                                
+    case 35     % ДЕТЕКТОР КЛЮЧЕВЫХ ТОЧЕК
+        
+        set(menu_handles.FiltParText2,'String','Детектор');
+        set(menu_handles.FiltParMenu2,'String',{'BRISK',...
+                                                'углов (FAST)',...
+                                                'углов (Харриса)',...
+                                                'углов (мин. собств. значений)',...
+                                                'SURF'});
+       
+        set(menu_handles.AlphaText,'String','Мин. качество: ');
+        set(menu_handles.AlphaSlider,'Min',0,'Max',1,'Value',0.1,'SliderStep',[0.01/1 0.1/1]);
+        set(menu_handles.AlphaValText,'String','0.1');
+        
+        set(menu_handles.BetaText,'String','Мин. контраст: ');
+        set(menu_handles.BetaSlider,'Min',0.01,'Max',0.99,'Value',0.1,'SliderStep',[0.01/0.98 0.1/0.98]);
+        set(menu_handles.BetaValText,'String','0.1'); 
+        
+        set(menu_handles.DeltaText,'String','Число октав: ');
+        set(menu_handles.DeltaSlider,'Min',0,'Max',6,'Value',2,'SliderStep',[1/6 1/6]);
+        set(menu_handles.DeltaValText,'String','2');
+        
+        set(menu_handles.GammaText,'String','Размер фильтра: ');
+        
+        set(menu_handles.EpsilonText,'String','Уровней масштаба: ');
+        set(menu_handles.EpsilonSlider,'Min',3,'Max',10,'Value',3,'SliderStep',[1/7 10/7]);
+        set(menu_handles.EpsilonValText,'String','3');
+        
+        set(menu_handles.ZetaText,'String','Порог: ');
+        set(menu_handles.ZetaSlider,'Min',1,'Max',20000,'Value',500,'SliderStep',[1/19999 10/19999]);
+        set(menu_handles.ZetaValText,'String','500'); 
 end
 
 
@@ -2840,6 +2875,108 @@ switch get(menu_handles.FilterType,'Value')     % тип обработки
                     ],'Visible','off');
                 
         end
+        
+    case 35     % детектор ключевых точек
+        
+        s = size(Original);
+        maxH = min(s(1),s(2));
+        maxMEV = max(s(1),s(2));
+                
+        % прячем все, потом будем открывать попунктно
+        set([  ...
+            menu_handles.AlphaSlider;...
+            menu_handles.BetaSlider;...
+            menu_handles.GammaSlider;...
+            menu_handles.DeltaSlider;...
+            menu_handles.AlphaText;...
+            menu_handles.BetaText;...
+            menu_handles.GammaText;....
+            menu_handles.DeltaText;...
+            menu_handles.AlphaValText;...
+            menu_handles.BetaValText;...
+            menu_handles.GammaValText;...
+            menu_handles.DeltaValText;...
+            menu_handles.EpsilonSlider;...
+            menu_handles.EpsilonText;...
+            menu_handles.EpsilonValText;...
+            menu_handles.ZetaSlider;...
+            menu_handles.ZetaText;...
+            menu_handles.ZetaValText;...
+            ],'Visible','off');
+        
+        switch get(menu_handles.FiltParMenu2,'Value')
+            
+            case 1      % BRISK
+                set([  ...
+                    menu_handles.AlphaSlider;...
+                    menu_handles.BetaSlider;...
+                    menu_handles.DeltaSlider;...
+                    menu_handles.AlphaText;...
+                    menu_handles.BetaText;...
+                    menu_handles.DeltaText;...
+                    menu_handles.AlphaValText;...
+                    menu_handles.BetaValText;...
+                    menu_handles.DeltaValText...
+                    ],'Visible','on');
+                
+                set(menu_handles.DeltaSlider,'Min',0,'Max',6,'Value',2,'SliderStep',[1/6 1/6]);
+                set(menu_handles.DeltaValText,'String','2');
+        
+            case 2      % FAST
+                set([  ...
+                    menu_handles.AlphaSlider;...
+                    menu_handles.BetaSlider;...
+                    menu_handles.AlphaText;...
+                    menu_handles.BetaText;...
+                    menu_handles.AlphaValText;...
+                    menu_handles.BetaValText...
+                    ],'Visible','on');
+                
+            case 3      % HARRIS
+                set([  ...
+                    menu_handles.AlphaSlider;...
+                    menu_handles.AlphaText;...
+                    menu_handles.AlphaValText;...
+                    menu_handles.GammaSlider;...
+                    menu_handles.GammaText;...
+                    menu_handles.GammaValText;...
+                    ],'Visible','on');
+                
+                set(menu_handles.GammaSlider,'Min',3,'Max',maxH,'Value',3,...
+                                            'SliderStep',[2/maxH 10/maxH]);
+                set(menu_handles.GammaValText,'String','3');
+                
+            case 4      % MinEugenVals
+                set([  ...
+                    menu_handles.AlphaSlider;...
+                    menu_handles.AlphaText;...
+                    menu_handles.AlphaValText;...
+                    menu_handles.GammaSlider;...
+                    menu_handles.GammaText;...
+                    menu_handles.GammaValText;...
+                    ],'Visible','on');
+                
+                set(menu_handles.GammaSlider,'Min',3,'Max',maxMEV,'Value',3,...
+                                        'SliderStep',[2/maxMEV 10/maxMEV]);
+                set(menu_handles.GammaValText,'String','3');
+                
+            case 5      % SURF
+                set([  ...
+                    menu_handles.DeltaSlider;...
+                    menu_handles.DeltaText;...
+                    menu_handles.DeltaValText;...
+                    menu_handles.EpsilonSlider;...
+                    menu_handles.EpsilonText;...
+                    menu_handles.EpsilonValText;...
+                    menu_handles.ZetaSlider;...
+                    menu_handles.ZetaText;...
+                    menu_handles.ZetaValText...
+                    ],'Visible','on');
+                
+                set(menu_handles.DeltaSlider,'Min',1,'Max',6,'Value',2,'SliderStep',[1/5 1/5]);
+                set(menu_handles.DeltaValText,'String','2');
+                
+        end
 end
 
 
@@ -3149,7 +3286,7 @@ switch get(menu_handles.FilterType,'Value')
     case {3,4,5,7,12,24,27,29,31,32}         % ПОРОГОВЫЙ
         A = round(A);
         
-    case {6,8,13,20,21,22,33}    % БИЛАТЕРАЛЬНЫЙ, ГАБОРА, НИЗКИХ ЧАСТОТ ГАУССА, ГАУССА+ЛАПЛАСА, 
+    case {6,8,13,20,21,22,33,35}    % БИЛАТЕРАЛЬНЫЙ, ГАБОРА, НИЗКИХ ЧАСТОТ ГАУССА, ГАУССА+ЛАПЛАСА, 
                
         A = round(A*100)/100;
         
@@ -3276,7 +3413,7 @@ RewriteTextString = 0;                  % не надо переписывать текстовую строку
 
 switch get(menu_handles.FilterType,'Value')
     
-    case {3,6,8,32,34}       % бинаризация, билатеральный
+    case {3,6,8,32,34,35}       % бинаризация, билатеральный
         
         B = round(B*100)/100;           % округляем
     
@@ -3523,6 +3660,10 @@ switch get(menu_handles.FilterType,'Value')
             set(menu_handles.BetaSlider,'Max',G-1,'SliderStep',[1/(G-1) 10/(G-1)]);
         end
         
+    case 35         % ключточки
+        
+        G = round(G);
+        G = G - 1 + mod(G,2);    % округлили и сделали нечетным        
         
 end
 
@@ -3559,7 +3700,7 @@ switch get(menu_handles.FilterType,'Value')
              D = char(8734);
          end
         
-    case {7,8,25}      % СЛЕПАЯ ОБРАТНАЯ СВЕРТКА    
+    case {7,8,25,35}      % СЛЕПАЯ ОБРАТНАЯ СВЕРТКА    
          D = round(D);                 
         
     case 9          % ПРЕОБРАЗОВАНИЕ ХАФА   
@@ -3634,7 +3775,7 @@ E = get(menu_handles.EpsilonSlider,'Value');
 
 switch get(menu_handles.FilterType,'Value')
     
-    case {4,8,9,25}                  % морфо обра-ка (ч/б) 
+    case {4,8,9,25,35}                  % морфо обра-ка (ч/б) 
         E = round(E);        
      
     case 10                 % ДЕКОРРЕЛЯЦИОННОЕ РАСТЯЖЕНИЕ
@@ -3672,7 +3813,7 @@ Z = get(menu_handles.ZetaSlider,'Value');
 
 switch get(menu_handles.FilterType,'Value')
     
-    case {4,9}                  % морфо обра-ка (ч/б) 
+    case {4,9,35}                  % морфо обра-ка (ч/б) 
         Z = round(Z);
         
     case 10        % ДЕКОРРЕЛЯЦИОННОЕ РАСТЯЖЕНИЕ
@@ -3779,8 +3920,16 @@ set(menu_handles.TetaValText,'String',num2str(Teta));
 function PreviewButton_Callback(~, ~, menu_handles)
 
 global Original;
+global FilteredAsOriginal;
 
-I = Noising(Original,...
+% если обработке подлежит не исходное изображение
+if isempty(FilteredAsOriginal)
+    I = Original;
+else
+    I = FilteredAsOriginal;
+end    
+    
+I = Noising(I,...
             get(menu_handles.NoiseType,'Value'),...
             get(menu_handles.Aslider,'Value'),...
             get(menu_handles.Bslider,'Value'));           
@@ -4636,6 +4785,37 @@ switch F(Current,1)     % если фильтр
             [type targets ' порог: ' num2str(F(Current,7)) ', '...
             num2str(F(Current,8)) char(8804) 'R' char(8804) num2str(F(Current,12))]);
         
+    case 35     % детектор ключевых точек
+        
+        switch F(Current,10)    
+            case 1      % BRISK
+                Parametrs(Current) = strcat(Parametrs(Current),...
+                    [' (BRISK), мин. качество: ' num2str(F(Current,3))...
+                    ', мин. контраст: ' num2str(F(Current,6)) ...
+                    ', число октав: ' num2str(F(Current,8))]);
+                
+            case 2      % FAST
+                Parametrs(Current) = strcat(Parametrs(Current),...  
+                    [' (углов FAST), мин. качество: ' num2str(F(Current,3))...
+                    ', мин. контраст: ' num2str(F(Current,6))]);     
+            
+            case 3      % HARRIS
+                Parametrs(Current) = strcat(Parametrs(Current),...
+                    [' (углов Харриса), мин. качество: ' num2str(F(Current,3))...
+                    ', размер окна: ' num2str(F(Current,7)) 'x' num2str(F(Current,7))]);    
+            
+            case 4      % MinEagenVals
+                Parametrs(Current) = strcat(Parametrs(Current),... 
+                    [' (углов (мин. собст. знач.)), мин. качество: ' num2str(F(Current,3))...
+                    ', размер окна: ' num2str(F(Current,7)) 'x' num2str(F(Current,7))]);
+            
+            case 5      % SURF
+               Parametrs(Current) = strcat(Parametrs(Current),... 
+                    [' (SURF), порог: ' num2str(F(Current,11))...
+                    ', число уровней мастаба: ' num2str(F(Current,9)) ...
+                    ', число октав: ' num2str(F(Current,8))]);
+        end
+        
 end
 
 set(menu_handles.UsePreviousFiltImage,'Enable','on');   % разблокируем галочку
@@ -5001,7 +5181,7 @@ for k = 1:size(Noises,1)
         return;
     end
     
-    %%%%%%%%%%%%%%%%%% ОБРАБОТККА
+    %%%%%%%%%%%%%%%%%% ОБРАБОТКА
     
     try
         Temp_Filtered(:,:,:,k) = Filtration(Temp_Noised(:,:,:,k),Filters(k));
@@ -6649,7 +6829,7 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
             switch size(Image,3)        % смотрим сколько каналов   
                 
                 case 3                  % триколор
-%                     
+                     
                     warning('off','all');                    
                     if FPM2 == 1
                         [centers, rads] = imfindcircles(Image,[delta eta],...
@@ -6696,9 +6876,72 @@ for CH = 1:size(Image,3)        % для каждого канала цвета
                         for y = 1:size(points,1)
                             Filtered(points(y,2),points(y,1),CH) = 1;
                         end
-                        
-                    end              
+                    end
             end
+            
+        case 35     % ДЕТЕКТОР КЛЮЧЕВЫХ ТОЧЕК/УГЛОВ
+            
+            % переводим в полутоновки
+            if size(Image,3) > 2       
+               Image = rgb2gray(Image(:,:,1:3)); 
+            end
+            
+            switch FPM2
+                
+                case 1      % BRISK
+                    points = detectBRISKFeatures(Image,'MinQuality',alpha,...
+                                                'MinContrast',beta,...
+                                                'NumOctaves',delta);                    
+                    
+                case 2      % FAST
+                    points = detectFASTFeatures(Image,'MinQuality',alpha,...
+                                                'MinContrast',beta);
+                    
+                case 3      % HARRIS
+                    points = detectHarrisFeatures(Image,'MinQuality',alpha,...
+                                                'FilterSize',gamma);
+                    
+                case 4      % MinEagenVals
+                    points = detectMinEigenFeatures(Image,'MinQuality',alpha,...
+                                                'FilterSize',gamma);
+                    
+                case 5      % SURF
+                    points = detectSURFFeatures(Image,'NumScaleLevels',epsilon,...
+                                                'MetricThreshold',zeta,...
+                                                'NumOctaves',delta); 
+            end
+            
+            coords = double(round(points.Location));    % координаты ключточек
+            init_coords = coords;                       % делаем копию
+            M = size(coords,1);
+            i = 1;
+            
+            for x = -2:2        % смещение для крестика
+                coords(i*M+1:i*M+M,:) = [init_coords(:,1)+x init_coords(:,2)-x];
+                i = i + 1;
+            end
+            
+            for x = 2:-1:-2        % смещение для крестика
+                coords(i*M+1:i*M+M,:) = [init_coords(:,1)+x init_coords(:,2)+x];
+                i = i + 1;
+            end
+            
+            % если есть выход за пределы изображения - делаем предельным
+            coords(coords(:,1) > size(Image,2)) = size(Image,2);
+            coords(coords(:,2) > size(Image,1)) = size(Image,1);
+            
+            coords(end+1,1) = size(Image,2);             % добавляем правую нижнюю
+            coords(end,2) = size(Image,1);               % точку для разреж. матрицы 
+            
+            % превращаем координаты из разреж матрицы в лог матрицу   
+            for CH = 1:size(Filtered,3)                
+                M = logical(full(sparse(coords(:,2),coords(:,1),ones(size(coords,1),1))));
+                Image(M) = 1;
+                Filtered(:,:,CH) = Image;
+            end 
+            
+            Filtered = uint8(Filtered*255);
+            return;
     end    
 end
 
@@ -7441,7 +7684,7 @@ winopen(['TempImage.' format]);
 
 
 % МЕНЮ ЗАПУСКА ОКНА "IMAGE ANALYZER"
-function RunImageAnalyzer_Callback(hObject, eventdata, ~)
+function RunImageAnalyzer_Callback(hObject, eventdata, ~) %#ok<DEFNU>
 
 global Original;
 global Noised;
@@ -8241,7 +8484,7 @@ feval([Slider '_Callback'],hObject,H,analyzer_handles);    % вызываем отклик
 
 
 % КОНТЕКСТНОЕ МЕНЮ "СОХРАНИТЬ СТРОКУ ОЦЕНОК КАК TXT"
-function SaveAssessmentTXT_Callback (hObject, ~, analyzer_handles)
+function SaveAssessmentTXT_Callback (~, ~, analyzer_handles)
 
 [FileName, PathName] = uiputfile(['*.' 'txt'],'Сохранить характеристики области интереса');
 
