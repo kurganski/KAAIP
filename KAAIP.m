@@ -50,49 +50,43 @@ fig = get(handles.KAAIP,'Position');  % получили координаты окна
 % отцентрировали окно
 set(handles.KAAIP,'Position',[(scr_res(3)-fig(3))/2 (scr_res(4)-fig(4))/2 fig(3) fig(4)]);
 
-toolboxes = ver();      % считываем наличие тулбоксов
-warning('off','all');
-matlab_version = toolboxes(1).Release;
-matlab_version = str2double(matlab_version(3:6));
+%===========================================================
 
+% проверяем наличие тулбоксов нужной версии
+WeHaveIPT = DoWeHaveThisToolbox('Image Processing Toolbox', 8); 
+WeHaveSAndMLT = DoWeHaveThisToolbox('Statistics and Machine Learning Toolbox', 1); 
+WeHaveCV = DoWeHaveThisToolbox('Computer Vision System Toolbox', 6);
 
-if matlab_version < 2015    
-    message_str = { 'Ваша версия Matlab ниже версии R2015a';...
-                    'Возможны ошибки и некорректное поведение программы'};
+% по отсутствию пакетов генерируем ошибку
+% сообщения об ошибки при отсутствии необходимых пакетов
+
+if ~WeHaveIPT
+    
+    GenerateError('No_IPT');
+    close(handles.KAACVP);
+    return;    
+    
+elseif ~WeHaveCV && WeHaveSAndMLT
+    
+    GenerateError('NoCV');
+    CV = false;
+    StatAndMLT = true;
+    return;
+    
+elseif WeHaveCV && ~WeHaveSAndMLT
+    
+    GenerateError('NoSMLT');
+    CV = true;
+    StatAndMLT = false;
+    return;
+    
+elseif ~WeHaveCV && ~WeHaveSAndMLT
+    
+    GenerateError('NoSMLT_NoCV');
+    CV = false;
+    StatAndMLT = false;
+    return;
 end
-
-StatAndMLT = false;         % проверка расширения Statistics and Machine Learning Toolbox
-for i = 1:size(toolboxes,2) % проходимся по каждому тулбоксу
-
-    if strcmp('Statistics and Machine Learning Toolbox',toolboxes(i).Name) == 1
-        StatAndMLT = true;
-    end
-end    
-
-CV = false;     % проверка расширения Computer Vision System Toolbox
-for i = 1:size(toolboxes,2) % проходимся по каждому
-
-    if strcmp('Computer Vision System Toolbox',toolboxes(i).Name) == 1
-        CV = true;
-    end
-end
-
-if ~ StatAndMLT     % нет расширения - дополняем инфо строку
-    message_str = [ message_str;...
-                    'Отсутствует расширение "Statistics and Machine Learning Toolbox":';...
-                    'В списке искажений экспоненциальный шум и шум Рэлея недоступны'];
-end
-
-if ~ CV 
-    message_str = [ message_str;...
-                    'Отсутствует расширение "Computer Vision System Toolbox":';...
-                    'В списке обработок детекторы ключевых точек недоступны'];
-end
-
-                        
-if ~isempty(message_str)    % вывод сообщения
-    questdlg(message_str,'KAAIP','OK','modal');
-end 
 
 
 %%%%%%%%%%%%%%%%%%%%%% МЕНЮ ИСХОДНОГО ИЗОБРАЖЕНИЯ %%%%%%%%%%%%%%%%%%%%%%%%%
@@ -117,27 +111,6 @@ if isempty(handles)            % значит неумный человек запустил fig вместо m
     if ~isempty(ok) || isempty(ok)      
         close(gcf);
         run('KAAIP.m');
-        return;
-    end
-end
-
-toolboxes = ver();          % считываем наличие тулбоксов
-good = false;
-for i = 1:size(toolboxes,2) % проходимся по каждому
-    
-    if strcmp('Image Processing Toolbox',toolboxes(i).Name) == 1
-        good = true;
-        break;      % если такой тулбокс есть, то все ок        
-    end 
-end
-
-if ~good
-    ok = questdlg({ 'Ваша версия Matlab не содержит необходимого расширения "Image Processing Toolbox", но вы держитесь здесь';...
-                    'Приложение будет закрыто. Вам всего доброго, хорошего настроения и здоровья.';
-                    'С установкой расширения все будет хорошо!'},'KAAIP','OK','modal');
-    
-    if ~isempty(ok) || isempty(ok)
-        close(gcf);
         return;
     end
 end
@@ -7665,7 +7638,7 @@ points(:,2) = points_y;
 points = unique(points,'rows');
 
 
-% ФУНКЦИЯ, ОТКРЫВАЮЩАЯ КАРТИНУК ПРИЛОЖЕНИЕМ ВИНДЫ
+% ФУНКЦИЯ, ОТКРЫВАЮЩАЯ КАРТИНУ ПРИЛОЖЕНИЕМ ВИНДЫ
 function OpenImageOutside(Image)
 
 global format;
@@ -7674,6 +7647,67 @@ global format;
 % перед закрытием удаляем файл
 imwrite(Image,['TempImage.' format]);
 winopen(['TempImage.' format]);
+
+
+% ПРОВЕРЯЕТ НАЛИЧИЕ УСТАНОВКИ ТУЛБОКСА НЕОБХОДИМОЙ ВЕРСИИ
+function ToolboxPresence = DoWeHaveThisToolbox(ThisToolbox, NecessaryToolboxVersion)
+
+assert(ischar(ThisToolbox),'Тулбокс не прописан строкой');
+assert(isnumeric(NecessaryToolboxVersion), 'NecessaryToolboxVersion - не число');
+
+ToolboxPresence = false;
+toolboxes = ver();          % считываем информацию по установленным пакетам
+
+for i = 1:size(toolboxes,2) % проходимся по каждому
+
+    if strcmp(ThisToolbox,toolboxes(i).Name) == 1 % если нашли  
+        
+        % и его версия соответствует или выше необходимой
+        if str2double(toolboxes(i).Version) >= NecessaryToolboxVersion            
+            ToolboxPresence = true;
+        end        
+    end
+end
+
+assert(islogical(ToolboxPresence), 'ToolboxPresence на выходе не логический');
+
+
+% ГЕНЕРИРУЕТ ОШИБКУ В СООТВЕТСТВИИ С ЕЕ КОДОМ И ЯЗЫКОМ
+function GenerateError(ErrorCode)
+
+% по коду ошибки прописываем информационную строку
+% в зависимости от языка возвращается определенная строчка
+switch ErrorCode        
+                               
+    case 'NoSMLT_NoCV'
+        
+        InfoStirng = [  'Отсутствует расширение "Computer Vision System Toolbox 7.3".';...
+                        'Отсутствует расширение "Statistics and Machine Learning Toolbox 1.0".';...
+                        'Некоторые обработки будут недоступны'];
+             
+    case 'NoSMLT'
+        
+        InfoStirng = [  'Отсутствует расширение "Statistics and Machine Learning Toolbox 1.0".';...
+                        'Некоторые обработки будут недоступны'];
+                    
+    case 'NoIPT'
+        
+        InfoStirng = [  'Отсутствует расширение "Image Processing Toolbox 8.0".';...
+                        '...Но вы держитесь здесь!';...
+                        'Приложение будет закрыто.';...
+                        'Вам всего доброго, хорошего настроения и здоровья!';...
+                        'С установкой расширений все будет как надо!'];
+    case 'NoCV'
+        
+        InfoStirng = [  'Отсутствует расширение "Computer Vision System Toolbox 6".';...
+                        'Некоторые обработки будут недоступны'];
+    otherwise
+        
+        assert(0, 'Неверно указан код ошибки!');        
+end
+
+% генерируем модальное окно ошибки
+errordlg(InfoStirng,'KAACVP','modal');
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
